@@ -70,8 +70,8 @@ async def initialize_knowledge_base():
             
             # Check if knowledge base already exists
             client = get_chroma_client()
-            collections = client.list_collections()
-            collection_names = [c.name for c in collections]
+            # In Chroma v0.6.0+, list_collections() returns list of names (strings)
+            collection_names = client.list_collections()
             
             expected_collections = ["bpjs_criteria", "ppk_kemenkes", "bates_guide"]
             missing_collections = [c for c in expected_collections if c not in collection_names]
@@ -162,8 +162,8 @@ async def health():
     try:
         from medical_triage_agent.knowledge_base.chroma_setup import get_chroma_client
         client = get_chroma_client()
-        collections = client.list_collections()
-        collection_names = [c.name for c in collections]
+        # In Chroma v0.6.0+, list_collections() returns list of names (strings)
+        collection_names = client.list_collections()
         expected = ["bpjs_criteria", "ppk_kemenkes", "bates_guide"]
         
         if all(c in collection_names for c in expected):

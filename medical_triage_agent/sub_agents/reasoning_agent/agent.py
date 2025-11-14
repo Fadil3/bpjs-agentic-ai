@@ -17,16 +17,27 @@ from google.genai import types
 
 from .prompt import REASONING_AGENT_INSTRUCTION
 from .tools.tools import check_bpjs_criteria_tool
+from medical_triage_agent.knowledge_base.chroma_tools import (
+    query_bpjs_criteria_tool,
+    query_ppk_kemenkes_tool,
+    query_knowledge_base_tool
+)
 
 reasoning_agent = Agent(
     model='gemini-2.5-flash',
     name="reasoning_agent",
     description="""Agent yang melakukan analisis klinis berdasarkan gejala 
     dan memetakan ke Kriteria Gawat Darurat BPJS. Menentukan triage level 
-    (Gawat Darurat / Mendesak / Non-Urgen) dengan justifikasi yang jelas.""",
+    (Gawat Darurat / Mendesak / Non-Urgen) dengan justifikasi yang jelas.
+    Memiliki akses ke Chroma vector database untuk BPJS criteria dan PPK Kemenkes guidelines.""",
     instruction=REASONING_AGENT_INSTRUCTION,
     generate_content_config=types.GenerateContentConfig(temperature=0.1),  # Low temperature untuk konsistensi
-    tools=[check_bpjs_criteria_tool],
+    tools=[
+        check_bpjs_criteria_tool,
+        query_bpjs_criteria_tool,
+        query_ppk_kemenkes_tool,
+        query_knowledge_base_tool
+    ],
     output_key="triage_result",  # Menyimpan hasil ke session state
 )
 

@@ -16,17 +16,19 @@ from google.adk.agents import Agent
 from google.genai import types
 
 from .prompt import INTERVIEW_AGENT_INSTRUCTION
-from .tools.tools import extract_symptoms_tool, query_interview_guide_tool
+from .tools.tools import extract_symptoms_tool
+from medical_triage_agent.knowledge_base.chroma_tools import query_bates_guide_tool
 
 interview_agent = Agent(
     model='gemini-2.5-flash',
     name="interview_agent",
     description="""Agent yang melakukan wawancara dinamis dengan pasien untuk 
     mengumpulkan gejala, durasi, dan informasi medis relevan. Menggunakan NLP 
-    untuk memahami keluhan dalam Bahasa Indonesia dan mengekstrak entitas medis.""",
+    untuk memahami keluhan dalam Bahasa Indonesia dan mengekstrak entitas medis.
+    Memiliki akses ke Chroma vector database untuk Bates Guide to Physical Examination.""",
     instruction=INTERVIEW_AGENT_INSTRUCTION,
     generate_content_config=types.GenerateContentConfig(temperature=0.3),
-    tools=[extract_symptoms_tool, query_interview_guide_tool],
+    tools=[extract_symptoms_tool, query_bates_guide_tool],
     output_key="symptoms_data",  # Menyimpan hasil ke session state
 )
 

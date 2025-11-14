@@ -19,11 +19,17 @@ from google import genai
 from google.genai import types
 from google.adk.tools import FunctionTool
 
+# Import Chroma tools for vector database queries
+from medical_triage_agent.knowledge_base.chroma_tools import (
+    query_bpjs_criteria,
+    query_ppk_kemenkes,
+)
+
 # Get environment variables
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-# Path to knowledge PDFs
+# Path to knowledge PDFs (fallback if Chroma is not available)
 # Note: Folder name is "knowlegde" (typo in original, but keeping it as is)
 KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowlegde"
 BPJS_PDF_PATH = KNOWLEDGE_DIR / "Pedoman-BPJS-Kriteria-Gawat-Darurat.pdf"
@@ -57,6 +63,14 @@ def check_bpjs_criteria(symptoms_data: str) -> str:
             "recommendation": "Konsultasi dengan dokter untuk evaluasi lebih lanjut"
         }, ensure_ascii=False, indent=2)
     
+    # Prepare symptoms summary (extract first)
+    gejala_utama = symptoms.get("gejala_utama", [])
+    gejala_penyerta = symptoms.get("gejala_penyerta", [])
+    durasi = symptoms.get("durasi", "")
+    tingkat_keparahan = symptoms.get("tingkat_keparahan", "")
+    riwayat_medis = symptoms.get("riwayat_medis", [])
+    obat = symptoms.get("obat", [])
+    
     # Initialize Gemini client
     client = genai.Client(
         vertexai=True,
@@ -64,11 +78,40 @@ def check_bpjs_criteria(symptoms_data: str) -> str:
         location=GOOGLE_CLOUD_LOCATION,
     )
     
-    # Read knowledge PDFs if available
-    pdf_parts = []
+    # Use Chroma vector database to get relevant information (FASTER & MORE ACCURATE)
+    print("[INFO] Querying Chroma vector database for relevant BPJS and PPK criteria...")
     
-    # Load BPJS criteria PDF
-    if BPJS_PDF_PATH.exists():
+    # Build query from symptoms
+    query_parts = []
+    if gejala_utama:
+        query_parts.extend(gejala_utama)
+    if gejala_penyerta:
+        query_parts.extend(gejala_penyerta)
+    if tingkat_keparahan:
+        query_parts.append(tingkat_keparahan)
+    if durasi:
+        query_parts.append(f"durasi {durasi}")
+    
+    query_text = " ".join(query_parts) if query_parts else "kriteria gawat darurat"
+    
+    # Query Chroma for relevant information
+    bpjs_info = ""
+    ppk_info = ""
+    try:
+        bpjs_info = query_bpjs_criteria(query_text, n_results=10)
+        print(f"[INFO] Retrieved {len(bpjs_info)} characters from BPJS criteria")
+    except Exception as e:
+        print(f"Warning: Could not query BPJS criteria from Chroma: {e}")
+    
+    try:
+        ppk_info = query_ppk_kemenkes(query_text, n_results=10)
+        print(f"[INFO] Retrieved {len(ppk_info)} characters from PPK Kemenkes")
+    except Exception as e:
+        print(f"Warning: Could not query PPK Kemenkes from Chroma: {e}")
+    
+    # Fallback: Read PDFs if Chroma queries failed or returned no results
+    pdf_parts = []
+    if (not bpjs_info or "No relevant information" in bpjs_info) and BPJS_PDF_PATH.exists():
         try:
             with open(BPJS_PDF_PATH, 'rb') as pdf_file:
                 pdf_bytes = pdf_file.read()
@@ -76,12 +119,11 @@ def check_bpjs_criteria(symptoms_data: str) -> str:
                     data=pdf_bytes,
                     mime_type="application/pdf"
                 ))
-                print(f"[INFO] Loaded BPJS criteria PDF: {BPJS_PDF_PATH.name}")
+                print(f"[INFO] Fallback: Loaded BPJS criteria PDF: {BPJS_PDF_PATH.name}")
         except Exception as e:
             print(f"Warning: Could not read BPJS PDF: {e}")
     
-    # Load PPK Kemenkes PDF
-    if PPK_KEMENKES_PDF_PATH.exists():
+    if (not ppk_info or "No relevant information" in ppk_info) and PPK_KEMENKES_PDF_PATH.exists():
         try:
             with open(PPK_KEMENKES_PDF_PATH, 'rb') as pdf_file:
                 pdf_bytes = pdf_file.read()
@@ -89,17 +131,9 @@ def check_bpjs_criteria(symptoms_data: str) -> str:
                     data=pdf_bytes,
                     mime_type="application/pdf"
                 ))
-                print(f"[INFO] Loaded PPK Kemenkes PDF: {PPK_KEMENKES_PDF_PATH.name}")
+                print(f"[INFO] Fallback: Loaded PPK Kemenkes PDF: {PPK_KEMENKES_PDF_PATH.name}")
         except Exception as e:
             print(f"Warning: Could not read PPK Kemenkes PDF: {e}")
-    
-    # Prepare symptoms summary
-    gejala_utama = symptoms.get("gejala_utama", [])
-    gejala_penyerta = symptoms.get("gejala_penyerta", [])
-    durasi = symptoms.get("durasi", "")
-    tingkat_keparahan = symptoms.get("tingkat_keparahan", "")
-    riwayat_medis = symptoms.get("riwayat_medis", [])
-    obat = symptoms.get("obat", [])
     
     # Check if symptoms are actually empty or if there's an issue
     all_symptoms_empty = (
@@ -124,19 +158,33 @@ Obat yang Dikonsumsi: {', '.join(obat) if obat else 'Tidak disebutkan'}
 {raw_symptoms_json}
 """
     
-    # Build prompt
+    # Build prompt with Chroma results
     knowledge_sources = []
-    if BPJS_PDF_PATH.exists():
-        knowledge_sources.append("Pedoman BPJS Kriteria Gawat Darurat")
-    if PPK_KEMENKES_PDF_PATH.exists():
-        knowledge_sources.append("Pedoman Pelayanan Primer Kesehatan (PPK) Kemenkes")
+    if bpjs_info and "No relevant information" not in bpjs_info:
+        knowledge_sources.append("Pedoman BPJS Kriteria Gawat Darurat (dari Chroma vector database)")
+    if ppk_info and "No relevant information" not in ppk_info:
+        knowledge_sources.append("Pedoman Pelayanan Primer Kesehatan (PPK) Kemenkes (dari Chroma vector database)")
+    if pdf_parts:
+        if BPJS_PDF_PATH.exists() and BPJS_PDF_PATH not in [p for p in pdf_parts if hasattr(p, 'data')]:
+            knowledge_sources.append("Pedoman BPJS Kriteria Gawat Darurat (PDF fallback)")
+        if PPK_KEMENKES_PDF_PATH.exists():
+            knowledge_sources.append("Pedoman Pelayanan Primer Kesehatan (PPK) Kemenkes (PDF fallback)")
     
     knowledge_ref = " dan ".join(knowledge_sources) if knowledge_sources else "Pedoman BPJS"
+    
+    # Include Chroma results in prompt
+    chroma_context = ""
+    if bpjs_info and "No relevant information" not in bpjs_info:
+        chroma_context += f"\n\n**Informasi Relevan dari Pedoman BPJS (Chroma Vector Database):**\n{bpjs_info}\n"
+    if ppk_info and "No relevant information" not in ppk_info:
+        chroma_context += f"\n\n**Informasi Relevan dari PPK Kemenkes (Chroma Vector Database):**\n{ppk_info}\n"
     
     prompt_text = f"""
 Anda adalah ahli triase medis yang berpengalaman. Tugas Anda adalah menganalisis 
 gejala pasien dan memetakannya ke Kriteria Gawat Darurat BPJS berdasarkan 
 {knowledge_ref} yang tersedia dalam knowledge base.
+
+{chroma_context}
 
 **PENTING - INSTRUKSI KRITIS:**
 1. **SELALU ANALISIS DATA MENTAH**: Jika gejala utama/penyerta tampak kosong, PERIKSA data mentah (raw data) di bawah. 
