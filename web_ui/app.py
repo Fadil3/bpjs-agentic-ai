@@ -48,6 +48,73 @@ APP_NAME = "medical-triage-agent"
 
 app = FastAPI(title="Medical Triage Agent - Custom UI")
 
+# ========================================
+# Chroma Knowledge Base Initialization
+# ========================================
+
+@app.on_event("startup")
+async def initialize_knowledge_base():
+    """
+    Initialize Chroma vector database on application startup (non-blocking).
+    This runs in the background so the app can start serving requests immediately.
+    """
+    async def _init_chroma():
+        """Background task to initialize Chroma."""
+        try:
+            from medical_triage_agent.knowledge_base.chroma_setup import (
+                get_chroma_client,
+                initialize_knowledge_base
+            )
+            
+            logger.info("Checking Chroma knowledge base...")
+            
+            # Check if knowledge base already exists
+            client = get_chroma_client()
+            collections = client.list_collections()
+            collection_names = [c.name for c in collections]
+            
+            expected_collections = ["bpjs_criteria", "ppk_kemenkes", "bates_guide"]
+            missing_collections = [c for c in expected_collections if c not in collection_names]
+            
+            if missing_collections:
+                logger.info(f"Missing collections: {missing_collections}. Initializing knowledge base in background...")
+                # Run in thread pool to avoid blocking
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(initialize_knowledge_base, False)
+                    results = future.result()
+                logger.info(f"Knowledge base initialized: {results}")
+            else:
+                # Verify collections have data
+                all_have_data = True
+                for coll_name in expected_collections:
+                    try:
+                        collection = client.get_collection(coll_name)
+                        if collection.count() == 0:
+                            all_have_data = False
+                            break
+                    except Exception:
+                        all_have_data = False
+                        break
+                
+                if not all_have_data:
+                    logger.info("Some collections are empty. Re-initializing in background...")
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(initialize_knowledge_base, True)
+                        results = future.result()
+                    logger.info(f"Knowledge base re-initialized: {results}")
+                else:
+                    logger.info("Chroma knowledge base is already initialized and ready.")
+        
+        except Exception as e:
+            logger.warning(f"Could not initialize Chroma knowledge base: {e}")
+            logger.warning("The app will continue, but knowledge base features may not work.")
+            # Don't fail startup if Chroma init fails - app can still run
+    
+    # Run initialization in background task
+    asyncio.create_task(_init_chroma())
+
 # CORS middleware for development
 app.add_middleware(
     CORSMiddleware,
@@ -91,7 +158,37 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint."""
-    return {"status": "ok", "app": APP_NAME}
+    chroma_status = "unknown"
+    try:
+        from medical_triage_agent.knowledge_base.chroma_setup import get_chroma_client
+        client = get_chroma_client()
+        collections = client.list_collections()
+        collection_names = [c.name for c in collections]
+        expected = ["bpjs_criteria", "ppk_kemenkes", "bates_guide"]
+        
+        if all(c in collection_names for c in expected):
+            # Check if collections have data
+            total_chunks = 0
+            for coll_name in expected:
+                try:
+                    collection = client.get_collection(coll_name)
+                    total_chunks += collection.count()
+                except Exception:
+                    pass
+            if total_chunks > 0:
+                chroma_status = f"ready ({total_chunks} chunks)"
+            else:
+                chroma_status = "initializing"
+        else:
+            chroma_status = "initializing"
+    except Exception:
+        chroma_status = "error"
+    
+    return {
+        "status": "ok",
+        "app": APP_NAME,
+        "chroma_knowledge_base": chroma_status
+    }
 
 # ========================================
 # WebSocket Endpoint

@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir uv
 
 # Copy project files
 COPY pyproject.toml uv.lock README.md ./
-COPY medical_triage_agent/ ./medical_triage_agent/
+COPY medical_triage_agent/ ./medical_triage_agent/  # Includes PDFs in knowlegde/ and knowledge/ directories
 COPY web_ui/app.py ./web_ui/
 COPY web_ui/__init__.py ./web_ui/
 
