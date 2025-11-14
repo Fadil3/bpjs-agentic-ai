@@ -1,0 +1,75 @@
+steps:
+  # Install uv
+  - name: 'python:3.12'
+    entrypoint: 'pip'
+    args: ['install', 'uv']
+  
+  # Build frontend
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['ci']
+    dir: 'web_ui/frontend'
+  
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['run', 'build']
+    dir: 'web_ui/frontend'
+
+  # Copy built frontend to static directory
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['-m', 'cp', '-r', 'web_ui/frontend/dist/*', 'web_ui/static/']
+
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/medical-triage-agent:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/medical-triage-agent:latest'
+      - '.'
+
+  # Push Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/medical-triage-agent:$SHORT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/medical-triage-agent:latest']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'medical-triage-agent'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/medical-triage-agent:$SHORT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '3600'
+      - '--max-instances'
+      - '10'
+      - '--set-env-vars'
+      - 'GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1'
+
+images:
+  - 'gcr.io/$PROJECT_ID/medical-triage-agent:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/medical-triage-agent:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '1800s'
+

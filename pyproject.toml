@@ -1,0 +1,38 @@
+[project]
+name = "medical-triage-agent"
+version = "0.1.0"
+description = "Smart Triage Agent - Sistem triase medis dengan multi-agent untuk membantu pasien mendapatkan perawatan sesuai tingkat urgensi"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4"
+dependencies = [
+    "google-adk>=1.13.0,<2.0.0",
+    "google-genai>=1.32.0,<2.0.0",
+    "google-cloud>=0.34.0,<0.35.0",
+    "google-cloud-aiplatform>=1.111.0,<2.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "websockets>=14.0",
+    "python-dotenv>=1.0.0",
+    "chromadb>=0.5.0,<1.0.0",
+    "pypdf>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "google-cloud-aiplatform[adk,agent-engines,evaluation]>=1.93.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "google-adk[eval]>=1.5.0",
+]
+deployment = [
+    "absl-py>=2.2.1",
+]
+
+# The build system is updated to use hatchling, a standard build backend.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
