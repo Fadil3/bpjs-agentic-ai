@@ -38,7 +38,16 @@ echo ""
 echo "Custom UI will be available at: http://127.0.0.1:8000"
 echo ""
 
-# Start custom UI server
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Generate log filename with timestamp (use absolute path from project root)
+PROJECT_ROOT="$(pwd)"
+LOG_FILE="$PROJECT_ROOT/logs/server_$(date +%Y%m%d_%H%M%S).log"
+echo "Logs will be saved to: $LOG_FILE"
+echo ""
+
+# Start custom UI server with logging
 cd web_ui
-uv run python app.py
+uv run python app.py 2>&1 | tee "$LOG_FILE"
 
