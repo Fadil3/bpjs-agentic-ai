@@ -58,18 +58,27 @@ async def initialize_knowledge_base():
     """
     Initialize Chroma vector database on application startup (non-blocking).
     This runs in the background so the app can start serving requests immediately.
+    
+    First tries to download from Cloud Storage, then initializes if needed.
     """
     async def _init_chroma():
         """Background task to initialize Chroma."""
         try:
             from medical_triage_agent.knowledge_base.chroma_setup import (
                 get_chroma_client,
-                initialize_knowledge_base
+                initialize_knowledge_base,
+                ensure_chroma_from_gcs
             )
             
             logger.info("Checking Chroma knowledge base...")
             
-            # Check if knowledge base already exists
+            # First, try to download from Cloud Storage if available
+            # This is fast (download) vs slow (re-embedding)
+            downloaded = ensure_chroma_from_gcs()
+            if downloaded:
+                logger.info("Chroma DB downloaded from Cloud Storage. Verifying...")
+            
+            # Check if knowledge base already exists (either downloaded or local)
             client = get_chroma_client()
             # In Chroma v0.6.0+, list_collections() returns list of names (strings)
             collection_names = client.list_collections()

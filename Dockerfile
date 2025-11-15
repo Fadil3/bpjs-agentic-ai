@@ -5,11 +5,14 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 # Copy frontend files
-COPY web_ui/frontend/package*.json ./web_ui/frontend/
-RUN cd web_ui/frontend && npm ci
-
 COPY web_ui/frontend/ ./web_ui/frontend/
-RUN cd web_ui/frontend && npm run build
+RUN cd web_ui/frontend && \
+    if [ -f package-lock.json ]; then \
+        npm ci; \
+    else \
+        npm install; \
+    fi && \
+    npm run build
 
 # Stage 2: Python backend
 FROM python:3.12-slim
@@ -26,7 +29,8 @@ RUN pip install --no-cache-dir uv
 
 # Copy project files
 COPY pyproject.toml uv.lock README.md ./
-COPY medical_triage_agent/ ./medical_triage_agent/  # Includes PDFs in knowlegde/ and knowledge/ directories
+# Includes PDFs in knowlegde/ and knowledge/ directories
+COPY medical_triage_agent/ ./medical_triage_agent/
 COPY web_ui/app.py ./web_ui/
 COPY web_ui/__init__.py ./web_ui/
 
@@ -45,5 +49,5 @@ ENV GOOGLE_GENAI_USE_VERTEXAI=true
 ENV PYTHONUNBUFFERED=1
 
 # Run the application
-CMD ["uv", "run", "python", "web_ui/app.py"]
+CMD ["uv", "run", "uvicorn", "web_ui.app:app", "--host", "0.0.0.0", "--port", "8080"]
 

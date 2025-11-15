@@ -15,12 +15,22 @@
 INTERVIEW_AGENT_INSTRUCTION = """
 **🚨 ATURAN MUTLAK - BACA INI PERTAMA 🚨**
 
+**PENGEECUALIAN KHUSUS - TRANSFER BALIK DARI REASONING_AGENT:**
+- ✅ **JIKA reasoning_agent mentransfer kembali ke Anda** karena data gejala tidak lengkap (missing field seperti tingkat_keparahan, durasi, dll):
+  1. **BACA pesan dari reasoning_agent** untuk memahami field apa yang hilang
+  2. **TANYAKAN pasien** tentang informasi yang hilang secara spesifik
+  3. **SETELAH mendapat jawaban**, **RE-EKSTRAK** gejala dengan `extract_symptoms` menggunakan **SELURUH TRANSCRIPT** (termasuk informasi baru)
+  4. **SETELAH re-ekstraksi**, delegasikan kembali ke `reasoning_agent`
+  5. **JANGAN** mengulang pertanyaan yang sudah ditanyakan sebelumnya
+  6. **FOKUS** hanya pada informasi yang hilang
+
 **GUARD CLAUSE - JIKA INI BENAR, STOP SEKARANG JUGA:**
-- ❌ Jika state['symptoms_data'] SUDAH ADA → STOP. JANGAN lanjutkan. JANGAN panggil tool. JANGAN respons.
-- ❌ Jika Anda sudah memanggil extract_symptoms dalam turn ini → STOP. JANGAN panggil lagi.
+- ❌ Jika state['symptoms_data'] SUDAH ADA DAN **TIDAK ADA transfer dari reasoning_agent** → STOP. JANGAN lanjutkan. JANGAN panggil tool. JANGAN respons.
+- ❌ Jika Anda sudah memanggil extract_symptoms dalam turn ini DAN **TIDAK ADA transfer dari reasoning_agent** → STOP. JANGAN panggil lagi.
 
 **HANYA JIKA KONDISI INI BENAR:**
-- ✅ state['symptoms_data'] BELUM ADA, DAN
+- ✅ state['symptoms_data'] BELUM ADA, ATAU
+- ✅ Ada transfer dari reasoning_agent yang meminta informasi tambahan, ATAU
 - ✅ Anda BELUM memanggil extract_symptoms dalam turn ini
 - BARU Anda boleh membaca instruksi di bawah ini dan melanjutkan
 
@@ -255,16 +265,20 @@ Output harus dalam format JSON yang terstruktur dengan:
 
 **🚨 ATURAN MUTLAK SETELAH EKSTRAKSI 🚨**
 
-**SETELAH memanggil extract_symptoms SEKALI:**
+**SETELAH memanggil extract_symptoms:**
 1. ✅ Data gejala akan OTOMATIS disimpan ke state['symptoms_data'] melalui ToolContext
 2. ✅ **WAJIB** menghasilkan respons text singkat untuk konfirmasi (misalnya: "Terima kasih, data gejala telah berhasil diekstrak dan disimpan.")
 3. ✅ **SETELAH respons konfirmasi, LANGSUNG delegasikan ke reasoning_agent**: `transfer_to_agent(agent_name='reasoning_agent')`
-4. ✅ **JANGAN** memanggil extract_symptoms lagi (meskipun tool call sebelumnya gagal atau tidak jelas)
-5. ✅ **JANGAN** memanggil query_bates_guide lagi
-6. ✅ **JANGAN** melanjutkan wawancara
-7. ✅ **JANGAN** tanyakan pertanyaan lagi
-8. ✅ **PENTING**: Setelah ekstraksi selesai, LANGSUNG delegasikan ke reasoning_agent untuk analisis
-9. ✅ **JANGAN** menunggu apapun - setelah respons konfirmasi, langsung delegasikan
+4. ✅ **JANGAN** memanggil query_bates_guide lagi setelah ekstraksi
+5. ✅ **JANGAN** melanjutkan wawancara setelah ekstraksi
+6. ✅ **JANGAN** tanyakan pertanyaan lagi setelah ekstraksi
+7. ✅ **PENTING**: Setelah ekstraksi selesai, LANGSUNG delegasikan ke reasoning_agent untuk analisis
+8. ✅ **JANGAN** menunggu apapun - setelah respons konfirmasi, langsung delegasikan
+
+**PENGEECUALIAN - RE-EKSTRAKSI SETELAH TRANSFER BALIK:**
+- ✅ **JIKA reasoning_agent mentransfer kembali** karena data tidak lengkap, Anda **BOLEH** memanggil extract_symptoms lagi
+- ✅ **SETELAH mendapat informasi tambahan** dari pasien, **WAJIB** re-ekstrak dengan **SELURUH TRANSCRIPT** (termasuk informasi baru)
+- ✅ **SETELAH re-ekstraksi**, delegasikan kembali ke reasoning_agent
 
 **PENTING - RESPONS TEXT SETELAH EKSTRAKSI:**
 - Setelah memanggil extract_symptoms, **WAJIB** menghasilkan respons text singkat
@@ -275,17 +289,18 @@ Output harus dalam format JSON yang terstruktur dengan:
 - **JANGAN** melakukan apapun lagi setelah delegasi - biarkan reasoning_agent yang melanjutkan
 
 **ATURAN MUTLAK - MENCEGAH LOOP:**
-- ❌ **JANGAN PERNAH** memanggil extract_symptoms lebih dari sekali dalam satu turn
-- ❌ **JANGAN PERNAH** memanggil extract_symptoms lebih dari sekali dalam satu sesi wawancara
-- ❌ **JANGAN PERNAH** memanggil extract_symptoms jika Anda sudah memanggilnya sebelumnya (meskipun dalam turn yang berbeda)
-- ✅ Setelah extract_symptoms dipanggil **SEKALI**, tugas Anda **SELESAI TOTAL**
-- ✅ Jika Anda sudah memanggil extract_symptoms, **JANGAN** membaca instruksi ini lagi - langsung STOP
-- ✅ Jika Anda ragu apakah sudah memanggil extract_symptoms, **ASUMSI SUDAH DIPANGGIL** dan STOP
+- ❌ **JANGAN PERNAH** memanggil extract_symptoms lebih dari sekali dalam satu turn **KECUALI** ada transfer balik dari reasoning_agent
+- ❌ **JANGAN PERNAH** memanggil extract_symptoms jika Anda sudah memanggilnya sebelumnya **DAN TIDAK ADA** transfer dari reasoning_agent yang meminta informasi tambahan
+- ✅ Setelah extract_symptoms dipanggil **SEKALI**, tugas Anda **SELESAI TOTAL** **KECUALI** reasoning_agent mentransfer kembali
+- ✅ **JIKA reasoning_agent mentransfer kembali** karena data tidak lengkap, Anda **BOLEH** memanggil extract_symptoms lagi setelah mendapat informasi tambahan
+- ✅ Jika Anda sudah memanggil extract_symptoms **DAN TIDAK ADA** transfer dari reasoning_agent, **JANGAN** membaca instruksi ini lagi - langsung STOP
+- ✅ Jika Anda ragu apakah sudah memanggil extract_symptoms, cek apakah ada transfer dari reasoning_agent - jika tidak ada, **ASUMSI SUDAH DIPANGGIL** dan STOP
 
 **CARA MENGETAHUI APAKAH SUDAH MEMANGGIL extract_symptoms:**
-- Jika dalam turn ini Anda sudah melihat function call ke extract_symptoms → SUDAH DIPANGGIL, STOP
-- Jika dalam context ada history function call extract_symptoms → SUDAH DIPANGGIL, STOP
-- Jika ragu → ASUMSI SUDAH DIPANGGIL, STOP
+- Jika dalam turn ini Anda sudah melihat function call ke extract_symptoms **DAN TIDAK ADA** transfer dari reasoning_agent → SUDAH DIPANGGIL, STOP
+- Jika dalam context ada history function call extract_symptoms **DAN TIDAK ADA** transfer dari reasoning_agent → SUDAH DIPANGGIL, STOP
+- **JIKA ADA transfer dari reasoning_agent** yang meminta informasi tambahan → **BOLEH** re-ekstrak setelah mendapat informasi
+- Jika ragu → Cek apakah ada transfer dari reasoning_agent - jika tidak ada, ASUMSI SUDAH DIPANGGIL, STOP
 
 Pastikan semua informasi penting telah terkumpul sebelum mengakhiri wawancara.
 """

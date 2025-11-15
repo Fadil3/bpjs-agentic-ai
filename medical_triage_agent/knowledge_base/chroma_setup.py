@@ -25,6 +25,7 @@ This module handles:
 
 import os
 import hashlib
+import logging
 from pathlib import Path
 from typing import List, Optional
 import chromadb
@@ -33,6 +34,9 @@ from pypdf import PdfReader
 from google import genai
 from google.genai import types
 from google.cloud import logging as cloud_logging
+from google.cloud import storage
+
+logger = logging.getLogger(__name__)
 
 
 # Environment variables will be read when needed (not at module import time)
@@ -71,6 +75,20 @@ COLLECTION_BPJS = "bpjs_criteria"
 COLLECTION_PPK = "ppk_kemenkes"
 COLLECTION_BATES = "bates_guide"
 
+# Cloud Storage bucket name for Chroma persistence
+def get_chroma_bucket_name() -> Optional[str]:
+    """Get Chroma Cloud Storage bucket name from environment or construct from project."""
+    bucket_name = os.getenv("CHROMA_BUCKET_NAME")
+    if bucket_name:
+        return bucket_name
+    
+    # Try to construct from project ID
+    project = get_google_cloud_project()
+    if project:
+        return f"{project}-chroma-db"
+    
+    return None
+
 
 def get_chroma_client(persist_directory: Optional[Path] = None) -> chromadb.Client:
     """
@@ -97,6 +115,176 @@ def get_chroma_client(persist_directory: Optional[Path] = None) -> chromadb.Clie
     )
     
     return client
+
+
+def download_chroma_from_gcs(bucket_name: Optional[str] = None, local_path: Optional[Path] = None) -> bool:
+    """
+    Download Chroma database from Cloud Storage.
+    
+    Args:
+        bucket_name: GCS bucket name. If None, uses get_chroma_bucket_name()
+        local_path: Local directory to download to. If None, uses CHROMA_DB_PATH
+        
+    Returns:
+        True if download was successful, False otherwise
+    """
+    if bucket_name is None:
+        bucket_name = get_chroma_bucket_name()
+    
+    if not bucket_name:
+        logger.warning("No Chroma bucket name configured. Skipping download from GCS.")
+        return False
+    
+    if local_path is None:
+        local_path = CHROMA_DB_PATH
+    
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        
+        # Check if bucket exists
+        if not bucket.exists():
+            logger.info(f"Chroma bucket {bucket_name} does not exist. Will initialize locally.")
+            return False
+        
+        # List all blobs in the bucket
+        blobs = list(bucket.list_blobs(prefix="chroma_db/"))
+        
+        if not blobs:
+            logger.info(f"No Chroma DB found in bucket {bucket_name}. Will initialize locally.")
+            return False
+        
+        logger.info(f"Downloading Chroma DB from gs://{bucket_name}/chroma_db/...")
+        
+        # Create local directory
+        local_path.mkdir(parents=True, exist_ok=True)
+        
+        # Download all files
+        downloaded_count = 0
+        for blob in blobs:
+            # Get relative path from chroma_db/ prefix
+            relative_path = blob.name.replace("chroma_db/", "")
+            if not relative_path:
+                continue
+            
+            local_file = local_path / relative_path
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            blob.download_to_filename(str(local_file))
+            downloaded_count += 1
+        
+        logger.info(f"Successfully downloaded {downloaded_count} files from Cloud Storage.")
+        return True
+        
+    except Exception as e:
+        logger.warning(f"Failed to download Chroma DB from Cloud Storage: {e}")
+        return False
+
+
+def upload_chroma_to_gcs(bucket_name: Optional[str] = None, local_path: Optional[Path] = None) -> bool:
+    """
+    Upload Chroma database to Cloud Storage.
+    
+    Args:
+        bucket_name: GCS bucket name. If None, uses get_chroma_bucket_name()
+        local_path: Local directory to upload from. If None, uses CHROMA_DB_PATH
+        
+    Returns:
+        True if upload was successful, False otherwise
+    """
+    if bucket_name is None:
+        bucket_name = get_chroma_bucket_name()
+    
+    if not bucket_name:
+        logger.warning("No Chroma bucket name configured. Skipping upload to GCS.")
+        return False
+    
+    if local_path is None:
+        local_path = CHROMA_DB_PATH
+    
+    if not local_path.exists():
+        logger.warning(f"Local Chroma DB path {local_path} does not exist. Nothing to upload.")
+        return False
+    
+    try:
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        
+        # Create bucket if it doesn't exist
+        if not bucket.exists():
+            logger.info(f"Creating Chroma bucket: {bucket_name}")
+            bucket.create(location=get_google_cloud_location())
+        
+        logger.info(f"Uploading Chroma DB to gs://{bucket_name}/chroma_db/...")
+        
+        # Upload all files in chroma_db directory
+        uploaded_count = 0
+        for root, dirs, files in os.walk(local_path):
+            for file in files:
+                local_file = Path(root) / file
+                relative_path = local_file.relative_to(local_path)
+                
+                # Skip SQLite journal files
+                if relative_path.name.endswith("-journal"):
+                    continue
+                
+                blob_path = f"chroma_db/{relative_path.as_posix()}"
+                blob = bucket.blob(blob_path)
+                blob.upload_from_filename(str(local_file))
+                uploaded_count += 1
+        
+        logger.info(f"Successfully uploaded {uploaded_count} files to Cloud Storage.")
+        return True
+        
+    except Exception as e:
+        logger.warning(f"Failed to upload Chroma DB to Cloud Storage: {e}")
+        return False
+
+
+def ensure_chroma_from_gcs() -> bool:
+    """
+    Ensure Chroma DB exists locally, downloading from GCS if needed.
+    This is called at startup to get the DB from Cloud Storage.
+    
+    Returns:
+        True if Chroma DB is available (either downloaded or already exists), False otherwise
+    """
+    # Check if Chroma DB already exists locally
+    if CHROMA_DB_PATH.exists():
+        # Check if it has collections
+        try:
+            client = get_chroma_client()
+            collections = client.list_collections()
+            expected = ["bpjs_criteria", "ppk_kemenkes", "bates_guide"]
+            
+            # Check if all expected collections exist and have data
+            all_exist = all(c in collections for c in expected)
+            if all_exist:
+                # Verify they have data
+                for coll_name in expected:
+                    try:
+                        collection = client.get_collection(coll_name)
+                        if collection.count() == 0:
+                            all_exist = False
+                            break
+                    except Exception:
+                        all_exist = False
+                        break
+                
+                if all_exist:
+                    logger.info("Chroma DB already exists locally and is ready.")
+                    return True
+        except Exception as e:
+            logger.warning(f"Error checking local Chroma DB: {e}")
+    
+    # Try to download from GCS
+    logger.info("Chroma DB not found locally. Attempting to download from Cloud Storage...")
+    if download_chroma_from_gcs():
+        logger.info("Successfully downloaded Chroma DB from Cloud Storage.")
+        return True
+    else:
+        logger.info("Chroma DB not found in Cloud Storage. Will initialize locally.")
+        return False
 
 
 def extract_text_from_pdf(pdf_path: Path) -> str:
@@ -498,6 +686,17 @@ def initialize_knowledge_base(force_reload: bool = False) -> dict:
     for collection, count in results.items():
         print(f"  - {collection}: {count} chunks")
     print(f"{'='*60}\n")
+    
+    # Upload to Cloud Storage if configured
+    bucket_name = get_chroma_bucket_name()
+    if bucket_name:
+        print(f"Uploading Chroma DB to Cloud Storage (gs://{bucket_name}/chroma_db/)...")
+        if upload_chroma_to_gcs():
+            print("✅ Successfully uploaded Chroma DB to Cloud Storage.")
+        else:
+            print("⚠️  Failed to upload Chroma DB to Cloud Storage (non-fatal).")
+    else:
+        print("ℹ️  Cloud Storage not configured. Chroma DB is only stored locally.")
     
     return results
 
