@@ -337,7 +337,7 @@ export function ChatMessagesView({
                 <div className="flex flex-col items-start max-w-[85%]">
                   <div className="rounded-2xl rounded-bl-sm bg-white border-2 border-gray-200 text-gray-900 px-4 py-2.5 shadow-lg">
                     <div className="flex items-center gap-1">
-                      <span className="text-sm text-foreground">Memproses</span>
+                      <span className="text-sm text-foreground"></span>
                       <span className="loading-dots">
                         <span className="dot">.</span>
                         <span className="dot">.</span>
