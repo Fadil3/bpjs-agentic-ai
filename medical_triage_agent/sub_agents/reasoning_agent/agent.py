@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from google.adk.agents import Agent
+from google.adk.planners import BuiltInPlanner
 from google.genai import types
 
 from .prompt import REASONING_AGENT_INSTRUCTION
@@ -23,6 +24,15 @@ from medical_triage_agent.knowledge_base.chroma_tools import (
     query_knowledge_base_tool
 )
 
+# Create thinking config for deep clinical reasoning
+thinking_config = types.ThinkingConfig(
+    include_thoughts=True,   # Include thinking process in response for transparency
+    thinking_budget=16000,   # Allocate tokens for deep reasoning (0-24576)
+)
+
+# Create planner with thinking config
+planner = BuiltInPlanner(thinking_config=thinking_config)
+
 reasoning_agent = Agent(
     model='gemini-2.5-flash',
     name="reasoning_agent",
@@ -31,7 +41,10 @@ reasoning_agent = Agent(
     (Gawat Darurat / Mendesak / Non-Urgen) dengan justifikasi yang jelas.
     Memiliki akses ke Chroma vector database untuk BPJS criteria dan PPK Kemenkes guidelines.""",
     instruction=REASONING_AGENT_INSTRUCTION,
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),  # Low temperature untuk konsistensi
+    generate_content_config=types.GenerateContentConfig(
+        temperature=0.1,  # Low temperature untuk konsistensi
+    ),
+    planner=planner,  # Use planner for thinking mode (required by ADK)
     tools=[
         check_bpjs_criteria_tool,
         query_bpjs_criteria_tool,

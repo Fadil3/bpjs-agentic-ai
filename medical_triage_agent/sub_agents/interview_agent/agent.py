@@ -25,10 +25,14 @@ interview_agent = Agent(
     description="""Agent yang melakukan wawancara dinamis dengan pasien untuk 
     mengumpulkan gejala, durasi, dan informasi medis relevan. Menggunakan NLP 
     untuk memahami keluhan dalam Bahasa Indonesia dan mengekstrak entitas medis.
-    Memiliki akses ke Chroma vector database untuk Bates Guide to Physical Examination.""",
+    Memiliki akses ke Chroma vector database untuk Bates Guide to Physical Examination.
+    Setelah ekstraksi gejala selesai, mendelegasikan ke reasoning_agent untuk analisis.""",
     instruction=INTERVIEW_AGENT_INSTRUCTION,
     generate_content_config=types.GenerateContentConfig(temperature=0.3),
     tools=[extract_symptoms_tool, query_bates_guide_tool],
-    output_key="symptoms_data",  # Menyimpan hasil ke session state
+    # NOTE: Tidak menggunakan output_key karena extract_symptoms menyimpan langsung ke state via ToolContext
+    # output_key akan menimpa JSON hasil ekstraksi dengan text response agent
+    # ToolContext akan otomatis disediakan oleh ADK sebagai parameter terakhir tool function
+    # NOTE: reasoning_agent akan ditambahkan sebagai sub-agent di agent.py untuk menghindari circular import
 )
 

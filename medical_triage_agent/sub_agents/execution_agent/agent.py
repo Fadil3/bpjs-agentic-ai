@@ -21,19 +21,27 @@ from .tools.tools import (
     schedule_mobile_jkn_tool,
     get_self_care_guide_tool
 )
+from medical_triage_agent.knowledge_base.chroma_tools import (
+    query_bpjs_criteria_tool,
+    query_ppk_kemenkes_tool,
+    query_knowledge_base_tool
+)
 
 execution_agent = Agent(
     model='gemini-2.5-flash',
     name="execution_agent",
     description="""Agent yang mengambil tindakan nyata berdasarkan triage level. 
     Memanggil API untuk layanan darurat, penjadwalan Mobile JKN, atau mengambil 
-    panduan self-care.""",
+    panduan self-care. Menyediakan justifikasi detail dengan referensi ke knowledge base.""",
     instruction=EXECUTION_AGENT_INSTRUCTION,
     generate_content_config=types.GenerateContentConfig(temperature=0.2),
     tools=[
         call_emergency_service_tool,
         schedule_mobile_jkn_tool,
-        get_self_care_guide_tool
+        get_self_care_guide_tool,
+        query_bpjs_criteria_tool,
+        query_ppk_kemenkes_tool,
+        query_knowledge_base_tool
     ],
     output_key="execution_result",  # Menyimpan hasil ke session state
 )

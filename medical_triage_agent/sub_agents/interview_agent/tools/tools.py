@@ -19,6 +19,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 from google.adk.tools import FunctionTool
+from google.adk.tools.tool_context import ToolContext
 
 # Get environment variables
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT")
@@ -29,13 +30,16 @@ KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
 BATES_PDF_PATH = KNOWLEDGE_DIR / "Bates_Guide_to_Physical_Examination.pdf"
 
 
-def extract_symptoms(conversation_transcript: str) -> str:
+def extract_symptoms(conversation_transcript: str, tool_context: ToolContext = None) -> str:
     """
     Mengekstrak dan strukturkan data gejala dari transkrip percakapan wawancara
     menggunakan Gemini LLM untuk ekstraksi entitas medis.
     
+    Data gejala akan OTOMATIS disimpan ke session state['symptoms_data'] jika ToolContext tersedia.
+    
     Args:
         conversation_transcript: Transkrip lengkap percakapan dengan pasien
+        tool_context: ToolContext untuk akses session state (otomatis disediakan oleh ADK)
         
     Returns:
         JSON string yang berisi data gejala terstruktur dengan:
@@ -49,7 +53,7 @@ def extract_symptoms(conversation_transcript: str) -> str:
     """
     if not conversation_transcript or not conversation_transcript.strip():
         # Return empty structure if transcript is empty
-        return json.dumps({
+        empty_result = {
             "gejala_utama": [],
             "gejala_penyerta": [],
             "durasi": "",
@@ -57,7 +61,22 @@ def extract_symptoms(conversation_transcript: str) -> str:
             "riwayat_medis": [],
             "obat": [],
             "alergi": []
-        }, ensure_ascii=False, indent=2)
+        }
+        empty_json = json.dumps(empty_result, ensure_ascii=False, indent=2)
+        
+        # Save to session state if ToolContext is available
+        if tool_context:
+            try:
+                if hasattr(tool_context, 'state'):
+                    tool_context.state['symptoms_data'] = empty_json
+                    print(f"[INFO] Saved empty symptoms_data to session state via ToolContext.state")
+                elif hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state'):
+                    tool_context.session.state['symptoms_data'] = empty_json
+                    print(f"[INFO] Saved empty symptoms_data to session state via ToolContext.session.state")
+            except Exception as e:
+                print(f"[ERROR] Failed to save empty result to state: {e}")
+        
+        return empty_json
     
     # Initialize Gemini client
     client = genai.Client(
@@ -66,19 +85,10 @@ def extract_symptoms(conversation_transcript: str) -> str:
         location=GOOGLE_CLOUD_LOCATION,
     )
     
-    # Read Bates Guide PDF if available
-    bates_pdf_content = None
-    if BATES_PDF_PATH.exists():
-        try:
-            with open(BATES_PDF_PATH, 'rb') as pdf_file:
-                pdf_bytes = pdf_file.read()
-                bates_pdf_content = types.Part.from_bytes(
-                    data=pdf_bytes,
-                    mime_type="application/pdf"
-                )
-                print(f"[INFO] Loaded Bates Guide to Physical Examination PDF: {BATES_PDF_PATH.name}")
-        except Exception as e:
-            print(f"Warning: Could not read Bates Guide PDF: {e}")
+    # NOTE: We do NOT load the full Bates Guide PDF here because:
+    # 1. The PDF has 1010 pages, exceeding Gemini's 1000 page limit
+    # 2. For symptom extraction, we only need the conversation transcript
+    # 3. If Bates Guide reference is needed, use query_bates_guide tool via Chroma vector database instead
     
     # Build prompt for symptom extraction
     prompt_text = """
@@ -107,10 +117,11 @@ dan medis yang relevan ke dalam format JSON terstruktur.
 - Obat: Nama obat yang sedang dikonsumsi (jika disebutkan)
 - Alergi: Alergi terhadap obat, makanan, atau zat tertentu (jika disebutkan)
 
-**Referensi Pemeriksaan Fisik:**
-Jika tersedia, gunakan Bates Guide to Physical Examination sebagai referensi untuk 
-mengidentifikasi temuan pemeriksaan fisik yang mungkin disebutkan dalam transkrip, 
-seperti tanda-tanda vital abnormal, temuan inspeksi, palpasi, atau auskultasi.
+**Catatan:**
+- Ekstrak informasi HANYA dari transkrip percakapan yang diberikan
+- Jika pasien menyebutkan temuan pemeriksaan fisik (tanda-tanda vital, inspeksi, palpasi, auskultasi), 
+  ekstrak sebagai bagian dari gejala atau informasi objektif
+- Gunakan pengetahuan medis umum untuk mengidentifikasi dan mengkategorikan gejala dengan benar
 
 **Output Format (JSON):**
 {{
@@ -131,10 +142,8 @@ seperti tanda-tanda vital abnormal, temuan inspeksi, palpasi, atau auskultasi.
 - Output HARUS valid JSON, tidak ada komentar atau teks tambahan di luar JSON
 """.format(transcript=conversation_transcript)
     
-    # Prepare content parts
+    # Prepare content parts (only text, no PDF)
     parts = [types.Part.from_text(text=prompt_text)]
-    if bates_pdf_content:
-        parts.append(bates_pdf_content)
     
     contents = [
         types.Content(
@@ -185,7 +194,26 @@ seperti tanda-tanda vital abnormal, temuan inspeksi, palpasi, atau auskultasi.
                 if not isinstance(validated_result[key], str):
                     validated_result[key] = str(validated_result[key]) if validated_result[key] else ""
             
-            return json.dumps(validated_result, ensure_ascii=False, indent=2)
+            # Save to session state if ToolContext is available
+            result_json = json.dumps(validated_result, ensure_ascii=False, indent=2)
+            
+            if tool_context:
+                try:
+                    # Try to access state directly
+                    if hasattr(tool_context, 'state'):
+                        tool_context.state['symptoms_data'] = result_json
+                        print(f"[INFO] Saved symptoms_data to session state via ToolContext.state")
+                    elif hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state'):
+                        tool_context.session.state['symptoms_data'] = result_json
+                        print(f"[INFO] Saved symptoms_data to session state via ToolContext.session.state")
+                    else:
+                        print(f"[WARNING] ToolContext available but cannot access state. Attributes: {dir(tool_context)}")
+                except Exception as e:
+                    print(f"[ERROR] Failed to save to state via ToolContext: {e}")
+            else:
+                print(f"[WARNING] ToolContext not available - cannot save to state automatically")
+            
+            return result_json
             
         except json.JSONDecodeError:
             # If not JSON, try to extract JSON from response
@@ -204,12 +232,26 @@ seperti tanda-tanda vital abnormal, temuan inspeksi, palpasi, atau auskultasi.
                         "obat": result.get("obat", []),
                         "alergi": result.get("alergi", [])
                     }
-                    return json.dumps(validated_result, ensure_ascii=False, indent=2)
+                    result_json = json.dumps(validated_result, ensure_ascii=False, indent=2)
+                    
+                    # Save to session state if ToolContext is available
+                    if tool_context:
+                        try:
+                            if hasattr(tool_context, 'state'):
+                                tool_context.state['symptoms_data'] = result_json
+                                print(f"[INFO] Saved symptoms_data to session state via ToolContext.state (fallback)")
+                            elif hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state'):
+                                tool_context.session.state['symptoms_data'] = result_json
+                                print(f"[INFO] Saved symptoms_data to session state via ToolContext.session.state (fallback)")
+                        except Exception as e:
+                            print(f"[ERROR] Failed to save fallback result to state: {e}")
+                    
+                    return result_json
                 except json.JSONDecodeError:
                     pass
             
             # Fallback: return structured response with extracted info in justification
-            return json.dumps({
+            fallback_result = {
                 "gejala_utama": [],
                 "gejala_penyerta": [],
                 "durasi": "",
@@ -218,11 +260,26 @@ seperti tanda-tanda vital abnormal, temuan inspeksi, palpasi, atau auskultasi.
                 "obat": [],
                 "alergi": [],
                 "note": "Ekstraksi otomatis gagal. Mohon review manual transkrip berikut: " + response_text[:200]
-            }, ensure_ascii=False, indent=2)
+            }
+            fallback_json = json.dumps(fallback_result, ensure_ascii=False, indent=2)
+            
+            # Save to session state if ToolContext is available
+            if tool_context:
+                try:
+                    if hasattr(tool_context, 'state'):
+                        tool_context.state['symptoms_data'] = fallback_json
+                        print(f"[INFO] Saved fallback symptoms_data to session state via ToolContext.state")
+                    elif hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state'):
+                        tool_context.session.state['symptoms_data'] = fallback_json
+                        print(f"[INFO] Saved fallback symptoms_data to session state via ToolContext.session.state")
+                except Exception as e:
+                    print(f"[ERROR] Failed to save fallback result to state: {e}")
+            
+            return fallback_json
             
     except Exception as e:
         # Error handling: return empty structure with error note
-        return json.dumps({
+        error_result = {
             "gejala_utama": [],
             "gejala_penyerta": [],
             "durasi": "",
@@ -232,13 +289,31 @@ seperti tanda-tanda vital abnormal, temuan inspeksi, palpasi, atau auskultasi.
             "alergi": [],
             "error": f"Error extracting symptoms: {str(e)}",
             "note": "Terjadi error dalam ekstraksi gejala. Mohon review manual transkrip percakapan."
-        }, ensure_ascii=False, indent=2)
+        }
+        error_json = json.dumps(error_result, ensure_ascii=False, indent=2)
+        
+        # Save error result to session state if ToolContext is available
+        if tool_context:
+            try:
+                if hasattr(tool_context, 'state'):
+                    tool_context.state['symptoms_data'] = error_json
+                    print(f"[INFO] Saved error symptoms_data to session state via ToolContext.state")
+                elif hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state'):
+                    tool_context.session.state['symptoms_data'] = error_json
+                    print(f"[INFO] Saved error symptoms_data to session state via ToolContext.session.state")
+            except Exception as e:
+                print(f"[ERROR] Failed to save error result to state: {e}")
+        
+        return error_json
 
 
 def query_interview_guide(question: str) -> str:
     """
     Mengquery Bates Guide to Physical Examination untuk mendapatkan panduan 
     teknik wawancara, pertanyaan yang tepat, atau informasi tentang pemeriksaan fisik.
+    
+    NOTE: Tool ini menggunakan Chroma vector database untuk query, bukan PDF langsung,
+    karena PDF memiliki 1010 halaman yang melebihi batas Gemini (1000 halaman).
     
     Tool ini membantu agent untuk:
     - Mempelajari teknik wawancara medis yang efektif
@@ -258,84 +333,15 @@ def query_interview_guide(question: str) -> str:
     if not question or not question.strip():
         return "Silakan berikan pertanyaan atau topik yang ingin dipelajari dari Bates Guide."
     
-    # Initialize Gemini client
-    client = genai.Client(
-        vertexai=True,
-        project=GOOGLE_CLOUD_PROJECT,
-        location=GOOGLE_CLOUD_LOCATION,
-    )
-    
-    # Read Bates Guide PDF if available
-    bates_pdf_content = None
-    if BATES_PDF_PATH.exists():
-        try:
-            with open(BATES_PDF_PATH, 'rb') as pdf_file:
-                pdf_bytes = pdf_file.read()
-                bates_pdf_content = types.Part.from_bytes(
-                    data=pdf_bytes,
-                    mime_type="application/pdf"
-                )
-                print(f"[INFO] Loaded Bates Guide for query: {BATES_PDF_PATH.name}")
-        except Exception as e:
-            print(f"Warning: Could not read Bates Guide PDF: {e}")
-            return f"Error: Tidak dapat membaca Bates Guide PDF: {str(e)}"
-    else:
-        return "Error: Bates Guide PDF tidak ditemukan."
-    
-    # Build prompt for querying the guide
-    prompt_text = f"""
-Anda adalah asisten yang membantu mengekstrak informasi dari Bates Guide to Physical Examination.
-
-**Pertanyaan/Topik:**
-{question}
-
-**Instruksi:**
-1. Cari informasi yang relevan dengan pertanyaan/topik di atas dalam Bates Guide
-2. Fokus pada:
-   - Teknik wawancara medis (interview techniques)
-   - Pertanyaan yang tepat untuk kondisi/gejala tertentu
-   - Cara mengeksplorasi gejala lebih dalam
-   - Panduan anamnesis yang komprehensif
-   - Cara menanyakan riwayat medis yang efektif
-3. Berikan ringkasan yang jelas dan praktis dalam Bahasa Indonesia
-4. Jika informasi tidak ditemukan, beri tahu bahwa informasi tidak tersedia dalam guide
-
-**Output:**
-Berikan ringkasan informasi yang relevan dalam format yang mudah dipahami untuk digunakan dalam wawancara medis.
-"""
-    
-    # Prepare content parts
-    parts = [types.Part.from_text(text=prompt_text)]
-    if bates_pdf_content:
-        parts.append(bates_pdf_content)
-    
-    contents = [
-        types.Content(
-            role="user",
-            parts=parts
-        )
-    ]
-    
-    generate_content_config = types.GenerateContentConfig(
-        temperature=0.2,  # Low temperature untuk konsistensi
-        top_p=0.95,
-        max_output_tokens=2048,
-    )
-    
+    # Use Chroma vector database instead of loading full PDF
+    # This avoids the 1000 page limit issue
     try:
-        # Generate response
-        response_text = ""
-        for chunk in client.models.generate_content_stream(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=generate_content_config,
-        ):
-            response_text += chunk.text
+        from medical_triage_agent.knowledge_base.chroma_tools import query_bates_guide
         
-        return response_text if response_text else "Tidak ada informasi yang ditemukan untuk pertanyaan ini."
-        
+        result = query_bates_guide(question, n_results=5)
+        return result if result else "Tidak ada informasi yang ditemukan untuk pertanyaan ini."
     except Exception as e:
-        return f"Error saat mengquery Bates Guide: {str(e)}"
+        return f"Error saat mengquery Bates Guide melalui Chroma: {str(e)}"
 
 
 extract_symptoms_tool = FunctionTool(
