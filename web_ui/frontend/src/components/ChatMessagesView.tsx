@@ -73,7 +73,6 @@ export function ChatMessagesView({
   isConnected,
 }: ChatMessagesViewProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -138,6 +137,25 @@ export function ChatMessagesView({
       <div className="flex-1 overflow-hidden bg-gray-50">
         <ScrollArea className="h-full">
           <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto bg-gray-50">
+            {/* Default Instruction Message */}
+            {messages.length === 0 && (
+              <div className="flex justify-start">
+                <div className="flex flex-col items-start max-w-[85%]">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-2xl rounded-bl-sm bg-white border-2 border-gray-200 text-gray-900 px-4 py-2.5 shadow-lg">
+                      <p className="text-sm text-foreground leading-relaxed">
+                        👋 Halo! Saya adalah Smart Triage Agent. Saya akan
+                        membantu Anda dalam proses triase medis.
+                        <br />
+                        <br />
+                        Silakan ceritakan <strong>keluhan utama</strong> atau
+                        gejala yang Anda rasakan saat ini.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -223,7 +241,9 @@ export function ChatMessagesView({
                       <div className="mt-2 px-2">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                           <BookOpen className="h-3 w-3" />
-                          <span className="font-medium">Referensi Dokumen:</span>
+                          <span className="font-medium">
+                            Referensi Dokumen:
+                          </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {message.references.map((ref, idx) => (
@@ -233,7 +253,9 @@ export function ChatMessagesView({
                               className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                             >
                               <FileText className="h-3 w-3 mr-1" />
-                              <span className="font-medium">{ref.filename}</span>
+                              <span className="font-medium">
+                                {ref.filename}
+                              </span>
                               <span className="ml-1 text-blue-600">
                                 (Chunk #{ref.chunks.join(", #")})
                               </span>
