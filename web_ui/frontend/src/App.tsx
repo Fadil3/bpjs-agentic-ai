@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ChatMessagesView } from "@/components/ChatMessagesView";
 
+interface Reference {
+  filename: string;
+  chunks: number[];
+}
+
 interface Message {
   type: "human" | "agent";
   content: string;
   id: string;
   timestamp?: string;
+  references?: Reference[];
 }
 
 interface AgentTransition {
@@ -24,6 +30,64 @@ function App() {
   const userIdRef = useRef(`user_${Date.now()}`);
   const sessionIdRef = useRef(`session_${Date.now()}`);
   const currentAgentRef = useRef<string | null>(null);
+
+  const extractReferences = useCallback((text: string): Reference[] => {
+    const references: Reference[] = [];
+    const referenceMap = new Map<string, Set<number>>();
+
+    // Pattern untuk mendeteksi referensi: "filename.pdf, Chunk #X, #Y" atau "filename.pdf, Chunk #X"
+    // Format yang didukung:
+    // - "filename.pdf, Chunk #42, #43"
+    // - "filename.pdf, Chunk #616"
+    // - "filename.pdf (Chunk #X)"
+    // - "filename.pdf, Chunk #4, #6"
+    const pattern = /([\w\-]+\.pdf),?\s*Chunk\s*#(\d+)(?:\s*,\s*#(\d+))*/gi;
+
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const filename = match[1];
+      const startIndex = match.index;
+      const matchLength = match[0].length;
+
+      // Ambil chunk pertama
+      const chunks = [parseInt(match[2], 10)];
+
+      // Jika ada chunk kedua dalam match
+      if (match[3]) {
+        chunks.push(parseInt(match[3], 10));
+      }
+
+      // Cari semua chunk tambahan setelah match (format: ", #X, #Y")
+      const afterMatch = text.substring(startIndex + matchLength);
+      const additionalChunks = afterMatch.match(/#(\d+)/g);
+      if (additionalChunks) {
+        additionalChunks.forEach((chunk) => {
+          const chunkNum = parseInt(chunk.replace("#", ""), 10);
+          if (!chunks.includes(chunkNum)) {
+            chunks.push(chunkNum);
+          }
+        });
+      }
+
+      // Hapus duplikat dan sort
+      const uniqueChunks = Array.from(new Set(chunks)).sort((a, b) => a - b);
+
+      if (!referenceMap.has(filename)) {
+        referenceMap.set(filename, new Set());
+      }
+      uniqueChunks.forEach((chunk) => referenceMap.get(filename)!.add(chunk));
+    }
+
+    // Convert map to array
+    referenceMap.forEach((chunks, filename) => {
+      references.push({
+        filename,
+        chunks: Array.from(chunks).sort((a, b) => a - b),
+      });
+    });
+
+    return references;
+  }, []);
 
   const detectAgentTransition = useCallback((text: string) => {
     const lowerText = text.toLowerCase();
@@ -67,97 +131,124 @@ function App() {
     }
   }, []);
 
-  const appendToAgentMessage = useCallback((text: string) => {
-    if (!text || text.trim() === "") {
-      return; // Skip empty text
-    }
-
-    setMessages((prev) => {
-      const lastMessage = prev[prev.length - 1];
-      if (lastMessage && lastMessage.type === "agent") {
-        const lastContent = lastMessage.content.trim();
-        const newText = text.trim();
-
-        // 1. Exact match at the end - skip
-        if (lastContent.endsWith(newText)) {
-          console.log("Skipping duplicate: exact match at end");
-          return prev;
-        }
-
-        // 2. Check if new text is already contained in last message (substring)
-        if (lastContent.includes(newText) && newText.length > 15) {
-          // Check position - if it's near the end, it's likely a duplicate
-          const lastIndex = lastContent.lastIndexOf(newText);
-          const distanceFromEnd =
-            lastContent.length - lastIndex - newText.length;
-          if (distanceFromEnd < 100) {
-            console.log("Skipping duplicate: substring near end");
-            return prev;
-          }
-        }
-
-        // 3. Check if new text starts with content that's already in last message
-        // This catches cases where agent sends "Baik, saya mengerti..." multiple times
-        const newTextWords = newText.split(/\s+/).slice(0, 10).join(" "); // First 10 words
-        if (newTextWords.length > 30 && lastContent.includes(newTextWords)) {
-          const lastIndex = lastContent.lastIndexOf(newTextWords);
-          const distanceFromEnd =
-            lastContent.length - lastIndex - newTextWords.length;
-          if (distanceFromEnd < 200) {
-            console.log("Skipping duplicate: similar opening phrase");
-            return prev;
-          }
-        }
-
-        // 4. Check for high similarity (fuzzy match) - if >80% similar, likely duplicate
-        if (newText.length > 30 && lastContent.length > 30) {
-          const windowSize = 200;
-          const lastWindow = lastContent.slice(
-            -Math.min(windowSize, lastContent.length)
-          );
-          const newWindow = newText.slice(
-            0,
-            Math.min(windowSize, newText.length)
-          );
-
-          const words1 = new Set(lastWindow.toLowerCase().split(/\s+/));
-          const words2 = new Set(newWindow.toLowerCase().split(/\s+/));
-          const intersection = new Set(
-            [...words1].filter((x) => words2.has(x))
-          );
-          const union = new Set([...words1, ...words2]);
-          const similarity =
-            union.size > 0 ? intersection.size / union.size : 0;
-          if (similarity > 0.8) {
-            console.log(
-              `Skipping duplicate: high similarity (${(
-                similarity * 100
-              ).toFixed(0)}%)`
-            );
-            return prev;
-          }
-        }
-
-        // Append new text to last message
-        return prev.map((msg, idx) =>
-          idx === prev.length - 1
-            ? { ...msg, content: msg.content + text }
-            : msg
-        );
-      } else {
-        // Create new agent message
-        return [
-          ...prev,
-          {
-            type: "agent" as const,
-            content: text,
-            id: `agent_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-          },
-        ];
+  const appendToAgentMessage = useCallback(
+    (text: string, references?: Reference[]) => {
+      if (!text || text.trim() === "") {
+        return; // Skip empty text
       }
-    });
-  }, []);
+
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage && lastMessage.type === "agent") {
+          const lastContent = lastMessage.content.trim();
+          const newText = text.trim();
+
+          // 1. Exact match at the end - skip
+          if (lastContent.endsWith(newText)) {
+            console.log("Skipping duplicate: exact match at end");
+            return prev;
+          }
+
+          // 2. Check if new text is already contained in last message (substring)
+          if (lastContent.includes(newText) && newText.length > 15) {
+            // Check position - if it's near the end, it's likely a duplicate
+            const lastIndex = lastContent.lastIndexOf(newText);
+            const distanceFromEnd =
+              lastContent.length - lastIndex - newText.length;
+            if (distanceFromEnd < 100) {
+              console.log("Skipping duplicate: substring near end");
+              return prev;
+            }
+          }
+
+          // 3. Check if new text starts with content that's already in last message
+          // This catches cases where agent sends "Baik, saya mengerti..." multiple times
+          const newTextWords = newText.split(/\s+/).slice(0, 10).join(" "); // First 10 words
+          if (newTextWords.length > 30 && lastContent.includes(newTextWords)) {
+            const lastIndex = lastContent.lastIndexOf(newTextWords);
+            const distanceFromEnd =
+              lastContent.length - lastIndex - newTextWords.length;
+            if (distanceFromEnd < 200) {
+              console.log("Skipping duplicate: similar opening phrase");
+              return prev;
+            }
+          }
+
+          // 4. Check for high similarity (fuzzy match) - if >80% similar, likely duplicate
+          if (newText.length > 30 && lastContent.length > 30) {
+            const windowSize = 200;
+            const lastWindow = lastContent.slice(
+              -Math.min(windowSize, lastContent.length)
+            );
+            const newWindow = newText.slice(
+              0,
+              Math.min(windowSize, newText.length)
+            );
+
+            const words1 = new Set(lastWindow.toLowerCase().split(/\s+/));
+            const words2 = new Set(newWindow.toLowerCase().split(/\s+/));
+            const intersection = new Set(
+              [...words1].filter((x) => words2.has(x))
+            );
+            const union = new Set([...words1, ...words2]);
+            const similarity =
+              union.size > 0 ? intersection.size / union.size : 0;
+            if (similarity > 0.8) {
+              console.log(
+                `Skipping duplicate: high similarity (${(
+                  similarity * 100
+                ).toFixed(0)}%)`
+              );
+              return prev;
+            }
+          }
+
+          // Append new text to last message and merge references
+          return prev.map((msg, idx) => {
+            if (idx === prev.length - 1) {
+              const existingRefs = msg.references || [];
+              const newRefs = references || [];
+              // Merge references: combine chunks for same filename
+              const mergedRefs = [...existingRefs, ...newRefs].reduce(
+                (acc, ref) => {
+                  const existing = acc.find((r) => r.filename === ref.filename);
+                  if (existing) {
+                    existing.chunks = [
+                      ...new Set([...existing.chunks, ...ref.chunks]),
+                    ].sort((a, b) => a - b);
+                  } else {
+                    acc.push({ ...ref });
+                  }
+                  return acc;
+                },
+                [] as Reference[]
+              );
+              return {
+                ...msg,
+                content: msg.content + text,
+                references: mergedRefs.length > 0 ? mergedRefs : undefined,
+              };
+            }
+            return msg;
+          });
+        } else {
+          // Create new agent message
+          return [
+            ...prev,
+            {
+              type: "agent" as const,
+              content: text,
+              id: `agent_${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              references:
+                references && references.length > 0 ? references : undefined,
+            },
+          ];
+        }
+      });
+    },
+    []
+  );
 
   const connect = useCallback(() => {
     // Determine WebSocket URL based on environment
@@ -180,8 +271,6 @@ function App() {
         const data = JSON.parse(event.data);
         console.log("Received event:", data);
 
-        setIsLoading(false);
-
         // Extract text content - prioritize data.text, fallback to data.content.parts
         let textContent: string | null = null;
 
@@ -196,15 +285,41 @@ function App() {
           }
         }
 
-        // Only process if we have text content
+        // Check if this is a delegation event (functionCall) with no text content
+        const hasFunctionCall = data.full_event?.content?.parts?.some(
+          (part: any) => part.functionCall
+        );
+
+        // If content and text are both null, but there's a functionCall, keep loading
+        // This happens during agent delegation (e.g., root_agent calling interview_agent)
+        if (!textContent && !data.content && hasFunctionCall) {
+          console.log("Agent delegation detected, keeping loading state");
+          // Keep loading state true - don't set it to false
+          return;
+        }
+
+        // If we have text content, process it and stop loading
         if (textContent) {
+          setIsLoading(false);
           // Detect agent transitions
           detectAgentTransition(textContent);
+          // Extract references from text
+          const references = extractReferences(textContent);
           // Append to message (deduplication handled in appendToAgentMessage)
-          appendToAgentMessage(textContent);
+          appendToAgentMessage(textContent, references);
+        } else {
+          // No text content and no function call - might be completion or error
+          // Check if event indicates completion
+          const finishReason = data.full_event?.finishReason;
+          if (finishReason === "STOP" || finishReason === "MAX_TOKENS") {
+            console.log("Event indicates completion, stopping loading");
+            setIsLoading(false);
+          }
+          // Otherwise, keep loading if we're already in loading state
         }
       } catch (e) {
         console.error("Error parsing event:", e);
+        setIsLoading(false);
       }
     };
 
@@ -225,7 +340,7 @@ function App() {
         setTimeout(() => connect(), 3000);
       }
     };
-  }, [detectAgentTransition, appendToAgentMessage]);
+  }, [detectAgentTransition, appendToAgentMessage, extractReferences]);
 
   useEffect(() => {
     connect();

@@ -13,16 +13,23 @@ import {
   Zap,
   FileText,
   Target,
+  BookOpen,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/utils";
+
+interface Reference {
+  filename: string;
+  chunks: number[];
+}
 
 interface Message {
   type: "human" | "agent";
   content: string;
   id: string;
   timestamp?: string;
+  references?: Reference[];
 }
 
 interface AgentTransition {
@@ -211,6 +218,30 @@ export function ChatMessagesView({
                         )}
                       </Button>
                     </div>
+                    {/* References Section */}
+                    {message.references && message.references.length > 0 && (
+                      <div className="mt-2 px-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                          <BookOpen className="h-3 w-3" />
+                          <span className="font-medium">Referensi Dokumen:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {message.references.map((ref, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              <span className="font-medium">{ref.filename}</span>
+                              <span className="ml-1 text-blue-600">
+                                (Chunk #{ref.chunks.join(", #")})
+                              </span>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <span className="text-xs text-muted-foreground mt-1 px-2">
                       {formatTime(message.timestamp)}
                     </span>
