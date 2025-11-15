@@ -12,6 +12,7 @@ interface Message {
   id: string;
   timestamp?: string;
   references?: Reference[];
+  author?: string; // Track which agent sent this message
 }
 
 interface AgentTransition {
@@ -132,14 +133,22 @@ function App() {
   }, []);
 
   const appendToAgentMessage = useCallback(
-    (text: string, references?: Reference[]) => {
+    (text: string, references?: Reference[], author?: string | null) => {
       if (!text || text.trim() === "") {
         return; // Skip empty text
       }
 
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
-        if (lastMessage && lastMessage.type === "agent") {
+        // Only append to last message if:
+        // 1. It's from an agent
+        // 2. It's from the same author (same agent)
+        // 3. The text is not a duplicate
+        if (
+          lastMessage &&
+          lastMessage.type === "agent" &&
+          lastMessage.author === author
+        ) {
           const lastContent = lastMessage.content.trim();
           const newText = text.trim();
 
@@ -232,14 +241,15 @@ function App() {
             return msg;
           });
         } else {
-          // Create new agent message
+          // Create new agent message (different agent or first agent message)
           return [
             ...prev,
             {
               type: "agent" as const,
               content: text,
-              id: `agent_${Date.now()}`,
+              id: `agent_${Date.now()}_${author || "unknown"}`,
               timestamp: new Date().toISOString(),
+              author: author || undefined,
               references:
                 references && references.length > 0 ? references : undefined,
             },
@@ -305,8 +315,10 @@ function App() {
           detectAgentTransition(textContent);
           // Extract references from text
           const references = extractReferences(textContent);
+          // Get author from event
+          const author = data.author || data.full_event?.author || null;
           // Append to message (deduplication handled in appendToAgentMessage)
-          appendToAgentMessage(textContent, references);
+          appendToAgentMessage(textContent, references, author);
         } else {
           // No text content and no function call - might be completion or error
           // Check if event indicates completion
@@ -352,37 +364,49 @@ function App() {
   }, [connect]);
 
   const handleSubmit = useCallback(
-    (query: string) => {
-      if (!query.trim() || !isConnected || isLoading) return;
+    (
+      query: string,
+      attachments?: {
+        type: "image" | "audio";
+        data: string;
+        mimeType: string;
+      }[]
+    ) => {
+      const hasContent =
+        query.trim() || (attachments && attachments.length > 0);
+      if (!hasContent || !isConnected || isLoading) return;
 
       // Add user message
       const userMessage: Message = {
         type: "human",
-        content: query,
+        content:
+          query ||
+          (attachments && attachments.length > 0 ? "Mengirim lampiran" : ""),
         id: `user_${Date.now()}`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      // Create agent message placeholder
-      const agentMessage: Message = {
-        type: "agent",
-        content: "",
-        id: `agent_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, agentMessage]);
-
+      // Don't create empty agent message placeholder - it will be created when first content arrives
       setIsLoading(true);
 
       // Send message via WebSocket
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: "text",
-            content: query,
-          })
-        );
+        const message: any = {
+          type: "text",
+          content: query || "",
+        };
+
+        // Add attachments if present
+        if (attachments && attachments.length > 0) {
+          message.attachments = attachments.map((att) => ({
+            type: att.type,
+            data: att.data,
+            mimeType: att.mimeType,
+          }));
+        }
+
+        wsRef.current.send(JSON.stringify(message));
       }
     },
     [isConnected, isLoading]

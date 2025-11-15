@@ -1,6 +1,7 @@
 """Custom Web UI for Medical Triage Agent - FastAPI application."""
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -236,18 +237,74 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 try:
                     json_message = json.loads(text_data)
                     user_message = json_message.get("content", json_message.get("text", text_data))
+                    attachments = json_message.get("attachments", [])
                 except json.JSONDecodeError:
                     user_message = text_data
+                    attachments = []
                 
-                if not user_message or user_message.strip() == "":
+                # Check if we have content or attachments
+                has_content = user_message and user_message.strip() != ""
+                has_attachments = attachments and len(attachments) > 0
+                
+                if not has_content and not has_attachments:
                     continue
                 
-                logger.debug(f"Received message: {user_message[:100]}...")
+                logger.debug(f"Received message: {user_message[:100] if user_message else 'No text'}...")
+                if has_attachments:
+                    logger.debug(f"Received {len(attachments)} attachment(s)")
+                
+                # Build parts for content
+                parts = []
+                
+                # Add text part if available
+                if has_content:
+                    parts.append(types.Part.from_text(text=user_message))
+                
+                # Add attachment parts (images and audio)
+                for attachment in attachments:
+                    att_type = attachment.get("type")
+                    att_data = attachment.get("data")
+                    att_mime = attachment.get("mimeType", "")
+                    
+                    if att_type == "image" and att_data:
+                        # Extract base64 data (remove data:image/...;base64, prefix if present)
+                        base64_data = att_data
+                        if "," in att_data:
+                            base64_data = att_data.split(",", 1)[1]
+                        
+                        try:
+                            image_data = base64.b64decode(base64_data)
+                            parts.append(types.Part.from_bytes(
+                                data=image_data,
+                                mime_type=att_mime or "image/jpeg"
+                            ))
+                            logger.debug(f"Added image part: {att_mime}")
+                        except Exception as e:
+                            logger.error(f"Error processing image: {e}")
+                    
+                    elif att_type == "audio" and att_data:
+                        # Extract base64 data (remove data:audio/...;base64, prefix if present)
+                        base64_data = att_data
+                        if "," in att_data:
+                            base64_data = att_data.split(",", 1)[1]
+                        
+                        try:
+                            audio_data = base64.b64decode(base64_data)
+                            parts.append(types.Part.from_bytes(
+                                data=audio_data,
+                                mime_type=att_mime or "audio/webm"
+                            ))
+                            logger.debug(f"Added audio part: {att_mime}")
+                        except Exception as e:
+                            logger.error(f"Error processing audio: {e}")
                 
                 # Create content for agent
+                if not parts:
+                    continue
+                    
                 content = types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=user_message)]
+                    parts=parts
                 )
                 
                 # Stream response from agent using run_async
