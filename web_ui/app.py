@@ -200,6 +200,33 @@ async def health():
         "chroma_knowledge_base": chroma_status
     }
 
+@app.get("/api/reverse-geocode")
+async def reverse_geocode(lat: float, lon: float):
+    """
+    Reverse geocoding endpoint to avoid CORS issues.
+    Proxies request to OpenStreetMap Nominatim API.
+    """
+    import httpx
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=10&addressdetails=1",
+                headers={
+                    "User-Agent": "MedicalTriageAgent/1.0"
+                },
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data
+            else:
+                logger.error(f"Reverse geocoding failed: {response.status_code}")
+                return {"error": "Reverse geocoding failed"}
+    except Exception as e:
+        logger.error(f"Error in reverse geocoding: {e}")
+        return {"error": str(e)}
+
 # ========================================
 # WebSocket Endpoint
 # ========================================
@@ -245,8 +272,44 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                 text_data = message["text"]
                 try:
                     json_message = json.loads(text_data)
+                    message_type = json_message.get("type", "text")
+                    
+                    # Handle location message (standalone)
+                    if message_type == "location":
+                        location = json_message.get("location")
+                        if location:
+                            # Save location to session state
+                            session.state["patient_location"] = location
+                            logger.info(f"Location saved to session state: {location}")
+                            continue  # Don't process as regular message
+                    
+                    # Handle regular text/attachment messages
                     user_message = json_message.get("content", json_message.get("text", text_data))
                     attachments = json_message.get("attachments", [])
+                    
+                    # Handle location sent together with first message
+                    location = json_message.get("location")
+                    if location:
+                        # For InMemorySessionService, we need to update the stored session directly
+                        # because get_session returns a copy
+                        try:
+                            # Access the internal storage directly (InMemorySessionService specific)
+                            stored_session = session_service.sessions[APP_NAME][user_id][session_id]
+                            stored_session.state["patient_location"] = location
+                            logger.info(f"Location saved to session state with first message: {location}")
+                            logger.info(f"Session state updated. Current state keys: {list(stored_session.state.keys())}")
+                            # Re-fetch session to get updated state for agent
+                            session = await session_service.get_session(
+                                app_name=APP_NAME,
+                                user_id=user_id,
+                                session_id=session_id
+                            )
+                            logger.info(f"Session re-fetched. State keys: {list(session.state.keys())}, patient_location: {session.state.get('patient_location')}")
+                        except (KeyError, AttributeError) as e:
+                            # Fallback: update the session object directly (may not persist in InMemorySessionService)
+                            session.state["patient_location"] = location
+                            logger.warning(f"Could not update stored session directly, updated session object: {e}")
+                            logger.info(f"Location saved to session state with first message: {location}")
                 except json.JSONDecodeError:
                     user_message = text_data
                     attachments = []
@@ -315,6 +378,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, session_id: str
                     role="user",
                     parts=parts
                 )
+                
+                # Log state before calling agent
+                logger.info(f"Calling agent with session state: {dict(session.state)}")
+                logger.info(f"patient_location in state: {session.state.get('patient_location')}")
                 
                 # Stream response from agent using run_async
                 # This works with non-Live API models like gemini-2.5-flash

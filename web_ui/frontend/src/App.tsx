@@ -27,6 +27,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentTransition | null>(null);
+  const [patientLocation, setPatientLocation] = useState<string | null>(null);
+  const [hasUserSentMessage, setHasUserSentMessage] = useState(false);
+  const hasUserSentMessageRef = useRef(false);
+  const locationSentRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const userIdRef = useRef(`user_${Date.now()}`);
   const sessionIdRef = useRef(`session_${Date.now()}`);
@@ -260,6 +264,8 @@ function App() {
     []
   );
 
+  // Removed sendLocationToBackend - location is now sent with first user message
+
   const connect = useCallback(() => {
     // Determine WebSocket URL based on environment
     // In dev mode (Vite), use proxy. In production, use same host
@@ -274,6 +280,7 @@ function App() {
       console.log("WebSocket connected");
       setIsConnected(true);
       setIsLoading(false);
+      // Location will be sent with first user message, not here
     };
 
     ws.onmessage = (event) => {
@@ -311,6 +318,17 @@ function App() {
         // If we have text content, process it and stop loading
         if (textContent) {
           setIsLoading(false);
+
+          // IMPORTANT: Don't process agent messages if user hasn't sent any message yet
+          // This prevents agent from sending messages automatically (e.g., after location detection)
+          // Use ref to get the latest value (closure issue)
+          if (!hasUserSentMessageRef.current) {
+            console.log(
+              "Ignoring agent message - user hasn't sent any message yet"
+            );
+            return;
+          }
+
           // Detect agent transitions
           detectAgentTransition(textContent);
           // Extract references from text
@@ -352,7 +370,12 @@ function App() {
         setTimeout(() => connect(), 3000);
       }
     };
-  }, [detectAgentTransition, appendToAgentMessage, extractReferences]);
+  }, [
+    detectAgentTransition,
+    appendToAgentMessage,
+    extractReferences,
+    patientLocation,
+  ]);
 
   useEffect(() => {
     connect();
@@ -386,6 +409,8 @@ function App() {
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, userMessage]);
+      setHasUserSentMessage(true); // Mark that user has sent a message
+      hasUserSentMessageRef.current = true; // Update ref immediately
 
       // Don't create empty agent message placeholder - it will be created when first content arrives
       setIsLoading(true);
@@ -406,16 +431,44 @@ function App() {
           }));
         }
 
+        // Send location with first message if available and not yet sent
+        if (patientLocation && !locationSentRef.current) {
+          message.location = patientLocation;
+          locationSentRef.current = true;
+          console.log("Sending location with first message:", patientLocation);
+        } else if (!patientLocation) {
+          console.log("No location available to send with first message");
+        }
+
         wsRef.current.send(JSON.stringify(message));
       }
     },
-    [isConnected, isLoading]
+    [isConnected, isLoading, patientLocation]
   );
+
+  const handleLocationUpdate = useCallback(
+    (location: string) => {
+      // Only update if location actually changed
+      if (patientLocation === location) {
+        return; // Skip if location hasn't changed
+      }
+
+      setPatientLocation(location);
+      // Don't send to backend here - location will be sent with first user message
+    },
+    [patientLocation]
+  );
+
+  // Note: Location is now sent via handleLocationUpdate, not via useEffect
+  // This prevents duplicate sends
 
   const handleClear = () => {
     setMessages([]);
     currentAgentRef.current = null;
     setActiveAgent(null);
+    locationSentRef.current = false;
+    setHasUserSentMessage(false); // Reset flag when clearing chat
+    hasUserSentMessageRef.current = false; // Reset ref when clearing chat
   };
 
   return (
@@ -427,6 +480,8 @@ function App() {
         onClear={handleClear}
         activeAgent={activeAgent}
         isConnected={isConnected}
+        onLocationUpdate={handleLocationUpdate}
+        hasUserSentMessage={hasUserSentMessage}
       />
     </div>
   );

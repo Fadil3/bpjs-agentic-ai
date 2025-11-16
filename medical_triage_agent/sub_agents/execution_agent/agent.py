@@ -21,6 +21,11 @@ from .tools.tools import (
     schedule_mobile_jkn_tool,
     get_self_care_guide_tool
 )
+from .tools.jkn_tools import (
+    query_fktp_registered_tool,
+    query_nearest_facility_tool,
+    query_jkn_medical_history_tool
+)
 from medical_triage_agent.knowledge_base.chroma_tools import (
     query_bpjs_criteria_tool,
     query_ppk_kemenkes_tool,
@@ -39,6 +44,9 @@ execution_agent = Agent(
         call_emergency_service_tool,
         schedule_mobile_jkn_tool,
         get_self_care_guide_tool,
+        query_fktp_registered_tool,
+        query_nearest_facility_tool,
+        query_jkn_medical_history_tool,
         query_bpjs_criteria_tool,
         query_ppk_kemenkes_tool,
         query_knowledge_base_tool

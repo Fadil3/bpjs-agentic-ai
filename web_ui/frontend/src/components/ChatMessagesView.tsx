@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InputForm } from "@/components/InputForm";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
+import { LocationWidget } from "@/components/LocationWidget";
 import {
   Copy,
   CopyCheck,
@@ -46,6 +47,8 @@ export interface ChatMessagesViewProps {
   onClear: () => void;
   activeAgent?: AgentTransition | null;
   isConnected: boolean;
+  onLocationUpdate?: (location: string) => void;
+  hasUserSentMessage?: boolean;
 }
 
 const agentIcons: Record<string, React.ReactNode> = {
@@ -91,6 +94,8 @@ export function ChatMessagesView({
   onClear,
   activeAgent,
   isConnected,
+  onLocationUpdate,
+  hasUserSentMessage = false,
 }: ChatMessagesViewProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -134,6 +139,7 @@ export function ChatMessagesView({
           </div>
           <div className="flex items-center gap-3">
             <ConnectionStatus isConnected={isConnected} />
+            <LocationWidget onLocationUpdate={onLocationUpdate} />
             {activeAgent && (
               <Badge
                 variant="secondary"
@@ -157,19 +163,17 @@ export function ChatMessagesView({
       <div className="flex-1 overflow-hidden bg-gray-50">
         <ScrollArea className="h-full">
           <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto bg-gray-50">
-            {/* Default Instruction Message */}
-            {messages.length === 0 && (
+            {/* Default Instruction Message - Only show if user hasn't sent any message yet */}
+            {!hasUserSentMessage && (
               <div className="flex justify-start">
                 <div className="flex flex-col items-start max-w-[85%]">
                   <div className="flex items-start gap-3">
                     <div className="rounded-2xl rounded-bl-sm bg-white border-2 border-gray-200 text-gray-900 px-4 py-2.5 shadow-lg">
                       <p className="text-sm text-foreground leading-relaxed">
-                        👋 Halo! Saya adalah Smart Triage Agent. Saya akan
-                        membantu Anda dalam proses triase medis.
+                        👋 Halo! Saya adalah Smart Triage Agent. Saya akan membantu Anda dalam proses triase medis.
                         <br />
                         <br />
-                        Silakan ceritakan <strong>keluhan utama</strong> atau
-                        gejala yang Anda rasakan saat ini.
+                        Silakan ceritakan keluhan utama atau gejala yang Anda rasakan saat ini.
                       </p>
                     </div>
                   </div>
