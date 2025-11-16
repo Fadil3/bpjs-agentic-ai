@@ -2,6 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { InputForm } from "@/components/InputForm";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { LocationWidget } from "@/components/LocationWidget";
@@ -14,6 +24,7 @@ import {
   FileText,
   Target,
   BookOpen,
+  Trash2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -161,7 +172,17 @@ export function ChatMessagesView({
   const [selectedFamilyMember, setSelectedFamilyMember] = useState<{
     [messageId: string]: string;
   }>({});
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleClearClick = () => {
+    setShowClearConfirm(true);
+  };
+
+  const handleConfirmClear = () => {
+    setShowClearConfirm(false);
+    onClear();
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -215,9 +236,42 @@ export function ChatMessagesView({
                 <span>{activeAgent.name}</span>
               </Badge>
             )}
-            <Button variant="outline" size="sm" onClick={onClear}>
-              Hapus Chat
-            </Button>
+            <Badge
+              variant="destructive"
+              className="flex items-center gap-1.5 cursor-pointer hover:bg-destructive/90 transition-colors"
+              onClick={handleClearClick}
+              title="Hapus semua pesan"
+            >
+              <Trash2 className="h-3 w-3" />
+              <span>Hapus Chat</span>
+            </Badge>
+            <AlertDialog
+              open={showClearConfirm}
+              onOpenChange={setShowClearConfirm}
+            >
+              <AlertDialogContent className="bg-white border-gray-200 shadow-xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-gray-900 font-semibold">
+                    Hapus Chat?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-gray-600">
+                    Apakah Anda yakin ingin menghapus semua pesan? Tindakan ini
+                    tidak dapat dibatalkan dan akan membuat session baru.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Batal
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleConfirmClear}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Hapus
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

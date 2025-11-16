@@ -14,17 +14,18 @@ Medical Triage Agent adalah sistem multi-agent yang mengotomatisasi proses trias
 
 ## Agent Details
 
-| Feature | Description |
-| --- | --- |
-| **Interaction Type** | Conversational |
-| **Complexity** | Advanced |
-| **Agent Type** | Multi Agent |
-| **Components** | Tools, AgentTools, Multi-step workflow |
-| **Vertical** | Healthcare |
+| Feature              | Description                            |
+| -------------------- | -------------------------------------- |
+| **Interaction Type** | Conversational                         |
+| **Complexity**       | Advanced                               |
+| **Agent Type**       | Multi Agent                            |
+| **Components**       | Tools, AgentTools, Multi-step workflow |
+| **Vertical**         | Healthcare                             |
 
 ## Tech Stack
 
 ### Backend & AI
+
 - **Python 3.12+** - Core programming language
 - **Google ADK (Agent Development Kit)** - Multi-agent orchestration framework
 - **FastAPI** - Modern web framework for building APIs
@@ -36,6 +37,7 @@ Medical Triage Agent adalah sistem multi-agent yang mengotomatisasi proses trias
 - **httpx** - Async HTTP client for API calls
 
 ### Frontend
+
 - **React 18** - UI library for building user interfaces
 - **TypeScript** - Typed JavaScript for better code quality
 - **Vite** - Fast build tool and dev server
@@ -44,6 +46,7 @@ Medical Triage Agent adalah sistem multi-agent yang mengotomatisasi proses trias
 - **WebSocket API** - Real-time bidirectional communication
 
 ### Infrastructure & DevOps
+
 - **Google Cloud Run** - Serverless container platform
 - **Docker** - Containerization for deployment
 - **Cloud Build** - CI/CD for automated builds
@@ -51,22 +54,26 @@ Medical Triage Agent adalah sistem multi-agent yang mengotomatisasi proses trias
 - **uv** - Fast Python package manager (replaces pip/poetry)
 
 ### Knowledge Base & Data
+
 - **Chroma DB** - Vector database with semantic search
 - **PDF Processing** - PDF extraction and chunking
 - **Semantic Search** - Vector similarity search for knowledge retrieval
 
 ### Development Tools
+
 - **uv** - Python dependency management
 - **npm/pnpm** - Node.js package management
 - **ESLint** - JavaScript/TypeScript linting
 - **Prettier** - Code formatting
 
 ### Communication & APIs
+
 - **WebSocket** - Real-time communication protocol
 - **REST API** - HTTP-based API endpoints
 - **OpenStreetMap Nominatim** - Reverse geocoding service (proxied through backend)
 
 ### Key Libraries & Frameworks
+
 - **google-genai** - Google Generative AI SDK
 - **chromadb** - Chroma vector database client
 - **pydantic** - Data validation using Python type annotations
@@ -237,6 +244,7 @@ sequenceDiagram
 ### Key Components
 
 #### 1. **Root Agent (Orchestrator)**
+
 - **Role**: Central coordinator that routes tasks to appropriate sub-agents
 - **Decision Logic**: Reads session state and delegates based on workflow stage
 - **State Checks**:
@@ -246,6 +254,7 @@ sequenceDiagram
   - None → delegate to `interview_agent`
 
 #### 2. **Interview Agent**
+
 - **Role**: Collects patient symptoms through dynamic conversation
 - **Tools**:
   - `extract_symptoms`: NLP extraction to structured JSON
@@ -253,6 +262,7 @@ sequenceDiagram
 - **Output**: `symptoms_data` (JSON) saved to session state
 
 #### 3. **Reasoning Agent**
+
 - **Role**: Analyzes symptoms and determines triage level (Gawat Darurat / Mendesak / Non-Urgen)
 - **Tools**:
   - `check_bpjs_criteria`: Analyzes against BPJS emergency criteria
@@ -262,6 +272,7 @@ sequenceDiagram
 - **Validation**: Can transfer back to `interview_agent` if data incomplete
 
 #### 4. **Execution Agent**
+
 - **Role**: Plans actions based on triage level
 - **Tools**:
   - `call_emergency_service`: Calls emergency services for critical cases
@@ -273,11 +284,13 @@ sequenceDiagram
 - **Output**: `execution_result` with action plan
 
 #### 5. **Documentation Agent**
+
 - **Role**: Generates SOAP medical documentation
 - **Input**: Reads all previous state (`symptoms_data`, `triage_result`, `execution_result`)
 - **Output**: `medical_documentation` (SOAP note)
 
 #### 6. **Knowledge Base (Chroma Vector Database)**
+
 - **Collections**:
   - `bpjs_criteria`: BPJS emergency criteria (59 chunks)
   - `ppk_kemenkes`: Primary health care guidelines (2,346 chunks)
@@ -491,6 +504,7 @@ gcloud services list --enabled | grep -E "(aiplatform|generativelanguage)"
 **Troubleshooting:**
 
 Jika masih mendapat error 403 setelah enable:
+
 - Tunggu beberapa menit (propagasi bisa memakan waktu)
 - Pastikan project ID di `.env` sesuai
 - Verifikasi billing account sudah diaktifkan untuk project
@@ -499,18 +513,21 @@ Jika masih mendapat error 403 setelah enable:
 ### Installation
 
 1. **Clone repository dan navigasi ke direktori:**
+
    ```bash
    cd python/agents/medical-triage-agent
    ```
 
 2. **Install dependencies:**
+
    ```bash
    uv sync
    ```
 
 3. **Setup environment variables:**
-   
+
    Buat file `.env` atau set environment variables:
+
    ```bash
    export GOOGLE_GENAI_USE_VERTEXAI=true
    export GOOGLE_CLOUD_PROJECT=<your-project-id>
@@ -518,6 +535,7 @@ Jika masih mendapat error 403 setelah enable:
    ```
 
    Atau gunakan file `.env`:
+
    ```bash
    GOOGLE_GENAI_USE_VERTEXAI=true
    GOOGLE_CLOUD_PROJECT=your-project-id
@@ -529,38 +547,44 @@ Jika masih mendapat error 403 setelah enable:
 ### Prerequisites Setup
 
 1. **Install Dependencies:**
+
    ```bash
    cd /home/seryu/projects/bpjs-agentic-ai
    uv sync
    ```
 
 2. **Setup Google Cloud Authentication:**
+
    ```bash
    gcloud auth application-default login
    ```
-   
+
    **Pastikan project ID Anda sudah benar:**
+
    ```bash
    gcloud config get-value project
    ```
 
 3. **Setup Environment Variables:**
-   
+
    **Opsi A: Menggunakan file `.env` (Recommended)**
-   
+
    Copy file `.env.example` ke `.env`:
+
    ```bash
    cp .env.example .env
    ```
-   
+
    Edit file `.env` dan isi dengan project ID dan location Anda:
+
    ```bash
    GOOGLE_GENAI_USE_VERTEXAI=true
    GOOGLE_CLOUD_PROJECT=your-project-id
    GOOGLE_CLOUD_LOCATION=us-central1
    ```
-   
+
    **Opsi B: Export langsung di terminal**
+
    ```bash
    export GOOGLE_GENAI_USE_VERTEXAI=true
    export GOOGLE_CLOUD_PROJECT=your-project-id
@@ -577,24 +601,26 @@ uv run adk run medical_triage_agent
 ```
 
 **Cara Menggunakan:**
+
 1. Agent akan memulai dengan greeting
 2. Ketik pesan Anda dan tekan Enter
 3. Agent akan melakukan wawancara medis
 4. Ketik `exit` untuk keluar
 
 **Contoh Interaksi CLI:**
+
 ```
 user: Halo, saya merasa tidak enak badan
 
-[root_agent]: Halo! Saya adalah Smart Triage Agent yang akan membantu 
-Anda mendapatkan perawatan yang tepat. Saya akan melakukan wawancara 
+[root_agent]: Halo! Saya adalah Smart Triage Agent yang akan membantu
+Anda mendapatkan perawatan yang tepat. Saya akan melakukan wawancara
 singkat untuk memahami keluhan Anda.
 
 Bisa ceritakan keluhan Anda secara detail?
 
 user: Saya demam tinggi sejak pagi, sekitar 39 derajat, dan sesak napas
 
-[interview_agent]: Terima kasih atas informasinya. Untuk membantu saya 
+[interview_agent]: Terima kasih atas informasinya. Untuk membantu saya
 memahami kondisi Anda lebih baik, saya perlu beberapa informasi tambahan:
 
 1. Berapa lama Anda sudah mengalami demam dan sesak napas?
@@ -613,6 +639,7 @@ uv run adk web
 ```
 
 **Output yang Diharapkan:**
+
 ```
 Starting ADK web server...
 Server running at: http://127.0.0.1:8000
@@ -622,14 +649,17 @@ Open this URL in your browser to interact with the agent.
 **Cara Menggunakan Web UI:**
 
 1. **Buka Browser:**
+
    - Buka URL yang ditampilkan (biasanya `http://127.0.0.1:8000` atau `http://localhost:8000`)
 
 2. **Pilih Agent:**
+
    - Di bagian atas kiri halaman, ada dropdown menu
    - Pilih `medical_triage_agent` dari dropdown
    - Chat interface akan muncul di kanan
 
 3. **Mulai Berinteraksi:**
+
    - Ketik pesan di chat box di bagian bawah
    - Tekan Enter atau klik tombol Send
    - Agent akan merespons dan melakukan wawancara medis
@@ -643,12 +673,14 @@ Open this URL in your browser to interact with the agent.
      - ✅ Dokumentasi SOAP
 
 **Keuntungan Web UI:**
+
 - ✅ **User-friendly**: Interface yang lebih mudah digunakan
 - ✅ **Visual**: Dapat melihat history percakapan dengan jelas
 - ✅ **Demo-ready**: Sangat cocok untuk presentasi dan demo
 - ✅ **Real-time**: Log interaksi ditampilkan di terminal secara real-time
 
 **Catatan Penting:**
+
 - Web UI akan tetap berjalan sampai Anda menekan `Ctrl+C` di terminal
 - Jangan tutup terminal saat Web UI sedang berjalan
 - Log interaksi akan ditampilkan di terminal secara real-time
@@ -668,6 +700,7 @@ User: Saya mengalami nyeri dada yang sangat hebat, sesak napas, dan keringat din
 ```
 
 **Expected Flow:**
+
 1. Interview agent mengumpulkan informasi
 2. Reasoning agent mengklasifikasikan sebagai "Gawat Darurat"
 3. Execution agent memanggil layanan darurat (mock)
@@ -680,6 +713,7 @@ User: Saya demam 38 derajat sejak 2 hari lalu, batuk, dan pilek
 ```
 
 **Expected Flow:**
+
 1. Interview agent mengumpulkan informasi
 2. Reasoning agent mengklasifikasikan sebagai "Mendesak"
 3. Execution agent melakukan booking Mobile JKN (mock)
@@ -692,6 +726,7 @@ User: Saya merasa sedikit pusing setelah bangun tidur, tapi sudah membaik
 ```
 
 **Expected Flow:**
+
 1. Interview agent mengumpulkan informasi
 2. Reasoning agent mengklasifikasikan sebagai "Non-Urgen"
 3. Execution agent memberikan panduan self-care
@@ -704,6 +739,7 @@ User: Saya merasa sedikit pusing setelah bangun tidur, tapi sudah membaik
 ### Error: "GOOGLE_CLOUD_PROJECT not set"
 
 **Solusi:**
+
 ```bash
 export GOOGLE_CLOUD_PROJECT=your-project-id
 # atau edit file .env
@@ -712,6 +748,7 @@ export GOOGLE_CLOUD_PROJECT=your-project-id
 ### Error: "Authentication failed"
 
 **Solusi:**
+
 ```bash
 gcloud auth application-default login
 ```
@@ -719,6 +756,7 @@ gcloud auth application-default login
 ### Error: "Module not found"
 
 **Solusi:**
+
 ```bash
 uv sync
 ```
@@ -726,6 +764,7 @@ uv sync
 ### Error: "Agent not found in dropdown"
 
 **Solusi:**
+
 - Pastikan Anda menjalankan `adk web` dari direktori yang benar
 - Pastikan nama agent di `agent.py` adalah `root_agent`
 - Cek apakah ada error di terminal
@@ -733,6 +772,7 @@ uv sync
 ### Web UI tidak muncul
 
 **Solusi:**
+
 - Cek apakah port 8000 sudah digunakan: `lsof -i :8000`
 - Coba gunakan port lain atau kill process yang menggunakan port tersebut
 - Pastikan firewall tidak memblokir localhost
@@ -768,30 +808,34 @@ gcloud builds submit --config cloudbuild.yaml
 ## Example Interaction
 
 **User:**
+
 ```
 Halo, saya merasa tidak enak badan
 ```
 
 **Agent (Orchestrator):**
+
 ```
-Halo! Saya adalah Smart Triage Agent yang akan membantu Anda mendapatkan 
-perawatan yang tepat. Saya akan melakukan wawancara singkat untuk memahami 
+Halo! Saya adalah Smart Triage Agent yang akan membantu Anda mendapatkan
+perawatan yang tepat. Saya akan melakukan wawancara singkat untuk memahami
 keluhan Anda.
 
 Bisa ceritakan keluhan Anda secara detail?
 ```
 
 **User:**
+
 ```
 Saya demam tinggi sejak pagi, sekitar 39 derajat, dan sesak napas
 ```
 
 **Agent (setelah wawancara dan reasoning):**
-```
-Berdasarkan gejala yang Anda sampaikan, sistem telah mengklasifikasikan 
-kondisi Anda sebagai **Gawat Darurat**. 
 
-Layanan darurat telah dipanggil dan ambulans akan tiba dalam 15-20 menit. 
+```
+Berdasarkan gejala yang Anda sampaikan, sistem telah mengklasifikasikan
+kondisi Anda sebagai **Gawat Darurat**.
+
+Layanan darurat telah dipanggil dan ambulans akan tiba dalam 15-20 menit.
 Rumah sakit terdekat telah diberitahu dan siap menerima Anda.
 
 Mohon tetap tenang dan jangan melakukan aktivitas berat.
@@ -816,6 +860,41 @@ uv run pytest tests
 
 Untuk testing dengan berbagai skenario, lihat bagian [Testing dengan Skenario Berbeda](#-testing-dengan-skenario-berbeda) di atas.
 
+### Testing Kasus Non-Urgen
+
+Untuk panduan lengkap tentang cara testing kasus non-urgen, lihat **[TESTING_NON_URGEN.md](TESTING_NON_URGEN.md)**.
+
+**Quick Test - Skenario Non-Urgen:**
+
+1. **Via ADK CLI:**
+
+   ```bash
+   uv run adk run medical_triage_agent
+   ```
+
+   Input: `Saya merasa sedikit pusing setelah bangun tidur, tapi sudah membaik sekarang`
+
+2. **Via Web UI:**
+
+   ```bash
+   uv run adk web
+   ```
+
+   Buka browser dan gunakan skenario yang sama
+
+3. **Expected Flow:**
+   - Interview agent mengumpulkan gejala
+   - Reasoning agent mengklasifikasikan sebagai **Non-Urgen**
+   - Execution agent memanggil `get_self_care_guide`
+   - Documentation agent membuat SOAP
+
+**Verifikasi:**
+
+- ✅ Triage level: **Non-Urgen**
+- ✅ Execution agent memanggil `get_self_care_guide`
+- ✅ Self-care guide diberikan kepada pasien
+- ✅ FKTP terdaftar disebutkan untuk konsultasi rutin
+
 ## Customization
 
 ### Menambahkan Kriteria BPJS
@@ -825,6 +904,7 @@ Edit file `medical_triage_agent/sub_agents/reasoning_agent/tools/tools.py` untuk
 ### Mengintegrasikan API Eksternal
 
 Edit file `medical_triage_agent/sub_agents/execution_agent/tools/tools.py` untuk mengintegrasikan:
+
 - API layanan darurat
 - API Mobile JKN
 - Database/RAG untuk panduan self-care
@@ -859,4 +939,3 @@ Agent ini dibuat untuk tujuan demonstrasi dan pembelajaran. Belum siap untuk pen
 Copyright 2025 Google LLC
 
 Licensed under the Apache License, Version 2.0
-

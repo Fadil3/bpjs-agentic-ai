@@ -307,17 +307,34 @@ function App() {
           (part: any) => part.functionCall
         );
 
+        // Check if there are function responses (tools being called)
+        const hasFunctionResponse = data.full_event?.content?.parts?.some(
+          (part: any) => part.functionResponse
+        );
+
         // If content and text are both null, but there's a functionCall, keep loading
         // This happens during agent delegation (e.g., root_agent calling interview_agent)
-        if (!textContent && !data.content && hasFunctionCall) {
-          console.log("Agent delegation detected, keeping loading state");
+        // OR when agent is calling tools (functionCall or functionResponse)
+        if (
+          !textContent &&
+          !data.content &&
+          (hasFunctionCall || hasFunctionResponse)
+        ) {
+          console.log(
+            "Agent delegation or tool call detected, keeping loading state"
+          );
           // Keep loading state true - don't set it to false
+          // Set loading to true if not already loading
+          if (!isLoading) {
+            setIsLoading(true);
+          }
           return;
         }
 
-        // If we have text content, process it and stop loading
+        // If we have text content, process it
         if (textContent) {
-          setIsLoading(false);
+          // Get author from event to check which agent is responding
+          const author = data.author || data.full_event?.author || null;
 
           // IMPORTANT: Don't process agent messages if user hasn't sent any message yet
           // This prevents agent from sending messages automatically (e.g., after location detection)
@@ -329,23 +346,96 @@ function App() {
             return;
           }
 
+          // Check if this is a "thought" message (internal reasoning)
+          const isThought =
+            data.full_event?.content?.parts?.some(
+              (part: any) => part.thought === true
+            ) || false;
+
+          // Skip thought messages from reasoning_agent (internal reasoning, not for user)
+          if (isThought && author === "reasoning_agent") {
+            console.log("Skipping thought message from reasoning_agent");
+            // Don't stop loading for thought messages - keep loading until real response
+            return;
+          }
+
+          // Check if this is from execution_agent - this is the final response
+          // Only stop loading when execution_agent provides text content
+          const isExecutionAgent = author === "execution_agent";
+
+          // Also check finishReason to ensure this is a complete response
+          const finishReason = data.full_event?.finishReason;
+          const isComplete =
+            finishReason === "STOP" || finishReason === "MAX_TOKENS";
+
+          // IMPORTANT: Only stop loading when execution_agent provides final response
+          // OR when any agent provides a complete response (STOP/MAX_TOKENS)
+          if (isExecutionAgent || isComplete) {
+            console.log(
+              `Text content received from ${author}, stopping loading state (complete: ${isComplete})`
+            );
+            setIsLoading(false);
+          } else {
+            // For other agents (interview_agent, reasoning_agent), keep loading
+            // because execution_agent hasn't responded yet
+            console.log(
+              `Text content received from ${author}, but keeping loading state (waiting for execution_agent)`
+            );
+            // Ensure loading is true while waiting for execution_agent
+            if (!isLoading) {
+              setIsLoading(true);
+            }
+          }
+
           // Detect agent transitions
           detectAgentTransition(textContent);
           // Extract references from text
           const references = extractReferences(textContent);
-          // Get author from event
-          const author = data.author || data.full_event?.author || null;
+
           // Append to message (deduplication handled in appendToAgentMessage)
           appendToAgentMessage(textContent, references, author);
         } else {
-          // No text content and no function call - might be completion or error
-          // Check if event indicates completion
+          // No text content - check for completion signals
           const finishReason = data.full_event?.finishReason;
+
+          // If event indicates completion (STOP or MAX_TOKENS), stop loading
           if (finishReason === "STOP" || finishReason === "MAX_TOKENS") {
             console.log("Event indicates completion, stopping loading");
             setIsLoading(false);
+            return;
           }
-          // Otherwise, keep loading if we're already in loading state
+
+          // Check if this is a functionResponse completion (tool finished)
+          // If there's a functionResponse but no more functionCalls, tool is done
+          // But we should still wait for agent's text response
+          if (hasFunctionResponse && !hasFunctionCall) {
+            // Tool response received, but wait for agent's text response
+            // Keep loading until we get text content
+            console.log(
+              "Tool response received, waiting for agent text response"
+            );
+            // Ensure loading is true while waiting
+            if (!isLoading) {
+              setIsLoading(true);
+            }
+            return;
+          }
+
+          // If we have functionCall but no text, keep loading
+          if (hasFunctionCall) {
+            // Agent is calling a tool, keep loading
+            if (!isLoading) {
+              setIsLoading(true);
+            }
+            return;
+          }
+
+          // If no text, no function call, and no completion signal,
+          // this might be an intermediate event - keep loading if already loading
+          // but don't force it to true if we're not loading
+          console.log(
+            "No text content, no function call, no completion - keeping current loading state"
+          );
         }
       } catch (e) {
         console.error("Error parsing event:", e);
@@ -463,12 +553,29 @@ function App() {
   // This prevents duplicate sends
 
   const handleClear = () => {
+    // Close existing WebSocket connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    // Reset all state
     setMessages([]);
     currentAgentRef.current = null;
     setActiveAgent(null);
     locationSentRef.current = false;
-    setHasUserSentMessage(false); // Reset flag when clearing chat
-    hasUserSentMessageRef.current = false; // Reset ref when clearing chat
+    setHasUserSentMessage(false);
+    hasUserSentMessageRef.current = false;
+    setPatientLocation(null);
+    setIsLoading(false);
+    setIsConnected(false);
+
+    // Create new session ID to ensure fresh session on backend
+    sessionIdRef.current = `session_${Date.now()}`;
+    userIdRef.current = `user_${Date.now()}`;
+
+    // Reconnect with new session
+    connect();
   };
 
   return (

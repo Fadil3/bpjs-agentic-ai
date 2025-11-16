@@ -1,0 +1,38 @@
+Triase Darurat Telehealth Agentic untuk Mobile JKN
+1. Latar Belakang Masalah
+Aplikasi Mobile JKN telah berhasil mentransformasi layanan administratif BPJS Kesehatan. Namun, fitur "Telehealth" (Konsultasi Dokter) yang ada saat ini masih memiliki ketergantungan fundamental pada ketersediaan dokter di Fasilitas Kesehatan Tingkat Pertama (FKTP) secara real-time. Ketergantungan ini menciptakan kesenjangan layanan (service gap) yang kritis. Permasalahan ini mencerminkan keluhan utama yang diterima BPJS Kesehatan. Sekitar 27.038 aduan adalah mengenai pelayanan kesehatan.2 Kemudian yang tertinggi kedua, materi aduan terkait administrasi sebanyak 24.567 orang. Terakhir pengaduan mengenai iuran BPJS Kesehatan sebanyak 11.271 orang. Ketergantungan ini menciptakan kesenjangan layanan (service gap) yang kritis:
+Keterbatasan Waktu: Peserta tidak dapat memperoleh panduan medis instan di luar jam kerja dokter, padahal kebutuhan darurat medis tidak mengenal waktu.
+Triase Tidak Efektif: Sistem saat ini tidak dirancang untuk menyaring atau memprioritaskan keluhan. Peserta dengan kondisi darurat dan peserta dengan keluhan ringan diperlakukan dalam satu antrian yang sama, menunggu ketersediaan dokter.
+Risiko Kepatuhan: Pedoman BPJS Kesehatan secara eksplisit menyatakan bahwa penanganan kondisi gawat darurat harus segera diberikan dan tidak memerlukan surat rujukan. Tanpa "pintu depan" digital yang mampu menilai kegawatdaruratan 24/7, peserta berisiko menunda penanganan atau salah memilih alur layanan.
+2. Pendekatan Solusi: Agentic AI
+Kesenjangan ini tidak dapat ditutup oleh chatbot tradisional yang pasif. Solusinya adalah implementasi Agentic AI—sebuah sistem AI canggih yang tidak hanya merespons perintah, tetapi juga dapat beroperasi secara otonom untuk mencapai tujuan. Berbeda dengan Gen AI yang hanya membuat konten, Agentic AI dapat:
+Merencanakan (Plan): Menganalisis keluhan pasien dan memecahnya menjadi langkah-langkah.
+Bertindak (Act): Menggunakan tools eksternal untuk mengeksekusi langkah tersebut.
+Berkolaborasi (Collaborate): Berinteraksi dengan sistem lain (seperti penjadwalan atau EMR) untuk menyelesaikan alur kerja secara penuh.
+3. Tujuan Proyek
+Menciptakan "Pintu Depan" Triase 24/7: Mengintegrasikan Agent (AI Otonom) ke dalam Mobile JKN untuk menyediakan layanan penilaian gejala (symptom checking) dan triase klinis yang instan, akurat, dan selalu tersedia bagi peserta JKN.
+Memastikan Kepatuhan Triase: Menjamin bahwa setiap rekomendasi yang diberikan oleh AI secara ketat mematuhi Kriteria Gawat Darurat yang telah ditetapkan oleh BPJS Kesehatan.
+Mengorkestrasi Alur Kerja Darurat: Memberdayakan AI Agent untuk secara otonom mengambil tindakan lanjutan berdasarkan hasil triase, baik itu eskalasi ke layanan darurat, penjadwalan prioritas, atau memberikan saran perawatan mandiri.
+Meningkatkan Efisiensi Faskes: Menyaring pasien secara efektif, mengarahkan kasus non-darurat keperawatan mandiri atau telehealth terjadwal, sehingga mengurangi beban antrean di IGD dan memfokuskan waktu dokter pada kasus-kasus yang paling mendesak.
+4. Deskripsi Solusi dan Fitur Utama
+Solusi ini adalah Agent Triase Cerdas (Smart Triage Agent) yang terintegrasi di dalam fitur Telehealth Mobile JKN. Saat peserta memulai konsultasi, Agent akan menjadi penanggap pertama.
+Fitur 1: Pengecek Gejala & Triase Dinamis Berbasis AI
+Agent menggunakan Natural Language Processing (NLP) yang dilatih khusus untuk konteks medis Bahasa Indonesia untuk memahami keluhan pasien (baik melalui teks atau suara). AI kemudian akan melakukan wawancara percakapan (triase dinamis) untuk mengumpulkan informasi kunci. Inti dari "otak" AI ini adalah reasoning engine yang memetakan gejala-gejala tersebut secara real-time terhadap Kriteria Gawat Darurat BPJS.  Agent akan segera mengklasifikasikan kondisi pasien ke dalam tiga level: gawat darurat, mendesak (urgent), dan Non-Urgent.
+Fitur 2: Otomatisasi Respons Agentic (Tindakan Otonom)
+Berdasarkan hasil triase, Agent akan secara otonom mengambil tindakan:
+Level Gawat Darurat: Agent akan segera menginstruksikan pasien untuk pergi ke IGD Rumah Sakit terdekat (sesuai prosedur BPJS, tanpa rujukan). Secara bersamaan, Agent dapat memicu aksi untuk memanggil ambulans atau mengirimkan notifikasi darurat ke faskes terdekat yang bekerja sama.
+Level Mendesak (urgent): Agent akan menjelaskan bahwa kondisi ini perlu penanganan dokter di Faskes 1 atau Puskesmas. Agent kemudian akan secara proaktif memindai jadwal dokter dan memesankan slot telehealth yang tersedia berikutnya (misalnya, "Dokter Anda tidak tersedia malam ini, namun saya telah menjadwalkan Anda untuk konsultasi video besok jam 08.30 WIB").
+Level Non-Urgen: Agent akan memberikan saran perawatan secara mandiri (self-care) yang tervalidasi secara klinis.
+Fitur 3: Otomatisasi Rekam Medis Cerdas
+Seluruh transkrip percakapan triase (keluhan utama, gejala, durasi, dan klasifikasi AI) secara otomatis diringkas dan disusun dalam format standar (misal: SOAP) dan dilakukan rekomendasi kodefikasi ke ICD-10 / ICD-9 untuk kasus yang bisa selesai secara online. Ketika dokter melakukan telekonsultasi (untuk kasus urgen) atau bertemu pasien di IGD (untuk kasus darurat), mereka sudah memiliki laporan awal yang lengkap sehingga bisa menghemat waktu anamnesis.
+5. Dampak yang Diharapkan
+Bagi Peserta JKN (Meningkatkan Customer Experience):
+Menutup kesenjangan layanan 24/7, memberikan rasa aman dan panduan medis instan kapanpun dibutuhkan.
+Mengurangi kebingungan dan kecemasan pasien dengan memberikan alur yang jelas (IGD RS, IGD Puskesmas / FKTP, dan telehealth, atau perawatan di rumah).
+Secara drastis mengurangi waktu tunggu antrian di faskes, yang merupakan keluhan utama peserta JKN
+Bagi Tenaga Medis (Mendukung Efisiensi Layanan):
+Agent AI bertindak sebagai "filter" cerdas, memastikan waktu dokter yang berharga difokuskan pada kasus-kasus yang paling relevan dan mendesak.
+Mengurangi beban kerja administratif melalui otomatisasi pencatatan rekam medis pra-konsultasi
+Bagi BPJS Kesehatan (Memperkuat Transparansi & Tata Kelola):
+Menciptakan proses triase yang terstandar, transparan, dan dapat diaudit, karena setiap keputusan didasarkan pada Kriteria Gawat Darurat BPJS yang resmi.
+Mengoptimalkan biaya layanan dengan mengarahkan pasien ke tingkat perawatan yang paling tepat (right-sizing care)
