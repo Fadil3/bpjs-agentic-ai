@@ -53,8 +53,9 @@ reasoning_agent = Agent(
     output_key="triage_result",  # Menyimpan hasil ke session state
 )
 
-# Add execution_agent as sub-agent after definition to avoid circular import
-# This allows reasoning_agent to directly delegate to execution_agent
+# Add sub-agents after definition to avoid circular import
+# This allows reasoning_agent to directly delegate to other agents
 from medical_triage_agent.sub_agents.execution_agent.agent import execution_agent
-reasoning_agent.sub_agents = [execution_agent]
+from medical_triage_agent.sub_agents.interview_agent.agent import interview_agent
+reasoning_agent.sub_agents = [execution_agent, interview_agent]
 

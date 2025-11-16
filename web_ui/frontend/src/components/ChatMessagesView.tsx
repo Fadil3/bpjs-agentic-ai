@@ -60,6 +60,7 @@ export interface ChatMessagesViewProps {
   isConnected: boolean;
   onLocationUpdate?: (location: string) => void;
   hasUserSentMessage?: boolean;
+  isReadOnly?: boolean; // If true, disable input form
 }
 
 const agentIcons: Record<string, React.ReactNode> = {
@@ -167,6 +168,7 @@ export function ChatMessagesView({
   isConnected,
   onLocationUpdate,
   hasUserSentMessage = false,
+  isReadOnly = false,
 }: ChatMessagesViewProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [selectedFamilyMember, setSelectedFamilyMember] = useState<{
@@ -533,16 +535,18 @@ export function ChatMessagesView({
         </ScrollArea>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-border bg-white p-4 shadow-sm">
-        <div className="max-w-4xl mx-auto">
-          <InputForm
-            onSubmit={onSubmit}
-            isLoading={isLoading}
-            disabled={!isConnected}
-          />
+      {/* Input Area - Hidden if read-only */}
+      {!isReadOnly && (
+        <div className="border-t border-border bg-white p-4 shadow-sm">
+          <div className="max-w-4xl mx-auto">
+            <InputForm
+              onSubmit={onSubmit}
+              isLoading={isLoading}
+              disabled={!isConnected}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
