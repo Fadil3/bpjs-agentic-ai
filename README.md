@@ -22,6 +22,56 @@ Medical Triage Agent adalah sistem multi-agent yang mengotomatisasi proses trias
 | **Components** | Tools, AgentTools, Multi-step workflow |
 | **Vertical** | Healthcare |
 
+## Tech Stack
+
+### Backend & AI
+- **Python 3.12+** - Core programming language
+- **Google ADK (Agent Development Kit)** - Multi-agent orchestration framework
+- **FastAPI** - Modern web framework for building APIs
+- **Uvicorn** - ASGI server for running FastAPI applications
+- **Google Vertex AI** - AI platform for Gemini models
+- **Gemini 2.5 Flash** - Large language model for agent reasoning
+- **text-embedding-004** - Embedding model for semantic search (768 dimensions)
+- **Chroma Vector Database** - Vector database for knowledge base storage
+- **httpx** - Async HTTP client for API calls
+
+### Frontend
+- **React 18** - UI library for building user interfaces
+- **TypeScript** - Typed JavaScript for better code quality
+- **Vite** - Fast build tool and dev server
+- **Tailwind CSS** - Utility-first CSS framework
+- **ReactMarkdown** - Markdown renderer for React
+- **WebSocket API** - Real-time bidirectional communication
+
+### Infrastructure & DevOps
+- **Google Cloud Run** - Serverless container platform
+- **Docker** - Containerization for deployment
+- **Cloud Build** - CI/CD for automated builds
+- **Google Cloud Storage** - Object storage for Chroma DB persistence
+- **uv** - Fast Python package manager (replaces pip/poetry)
+
+### Knowledge Base & Data
+- **Chroma DB** - Vector database with semantic search
+- **PDF Processing** - PDF extraction and chunking
+- **Semantic Search** - Vector similarity search for knowledge retrieval
+
+### Development Tools
+- **uv** - Python dependency management
+- **npm/pnpm** - Node.js package management
+- **ESLint** - JavaScript/TypeScript linting
+- **Prettier** - Code formatting
+
+### Communication & APIs
+- **WebSocket** - Real-time communication protocol
+- **REST API** - HTTP-based API endpoints
+- **OpenStreetMap Nominatim** - Reverse geocoding service (proxied through backend)
+
+### Key Libraries & Frameworks
+- **google-genai** - Google Generative AI SDK
+- **chromadb** - Chroma vector database client
+- **pydantic** - Data validation using Python type annotations
+- **python-dotenv** - Environment variable management
+
 ## Architecture
 
 ### System Overview
