@@ -87,6 +87,66 @@ const getAgentBadge = (author?: string): string => {
   return "orchestrator";
 };
 
+// Helper function to parse select data from message
+function parseSelectData(content: string): {
+  type: string;
+  options: Array<{ value: string; label: string; relationship?: string }>;
+} | null {
+  const startMarker = "<!--SELECT_START-->";
+  const endMarker = "<!--SELECT_END-->";
+
+  const startIdx = content.indexOf(startMarker);
+  const endIdx = content.indexOf(endMarker);
+
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+    return null;
+  }
+
+  // Extract content between markers
+  let jsonStr = content.substring(startIdx + startMarker.length, endIdx);
+
+  // Clean up: find first { and last } to extract valid JSON
+  const firstBrace = jsonStr.indexOf("{");
+  const lastBrace = jsonStr.lastIndexOf("}");
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    console.error("No valid JSON braces found");
+    return null;
+  }
+
+  // Extract JSON between first { and last }
+  jsonStr = jsonStr.substring(firstBrace, lastBrace + 1).trim();
+
+  try {
+    const data = JSON.parse(jsonStr);
+    if (data.type === "family_member_select" && Array.isArray(data.options)) {
+      return data;
+    }
+  } catch (e) {
+    console.error("Error parsing select data:", e);
+    console.error("JSON string (first 200 chars):", jsonStr.substring(0, 200));
+
+    // Try to fix escaped quotes if present
+    try {
+      const unescaped = jsonStr.replace(/\\"/g, '"').replace(/\\n/g, "\n");
+      const data = JSON.parse(unescaped);
+      if (data.type === "family_member_select" && Array.isArray(data.options)) {
+        console.warn("Successfully parsed after unescaping");
+        return data;
+      }
+    } catch (e2) {
+      console.error("Failed to fix JSON:", e2);
+    }
+  }
+
+  return null;
+}
+
+// Helper function to remove select markers from content
+function removeSelectMarkers(content: string): string {
+  return content.replace(/<!--SELECT_START-->.*?<!--SELECT_END-->/s, "");
+}
+
 export function ChatMessagesView({
   messages,
   isLoading,
@@ -98,6 +158,9 @@ export function ChatMessagesView({
   hasUserSentMessage = false,
 }: ChatMessagesViewProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState<{
+    [messageId: string]: string;
+  }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -170,10 +233,12 @@ export function ChatMessagesView({
                   <div className="flex items-start gap-3">
                     <div className="rounded-2xl rounded-bl-sm bg-white border-2 border-gray-200 text-gray-900 px-4 py-2.5 shadow-lg">
                       <p className="text-sm text-foreground leading-relaxed">
-                        👋 Halo! Saya adalah Smart Triage Agent. Saya akan membantu Anda dalam proses triase medis.
+                        👋 Halo! Saya adalah Smart Triage Agent. Saya akan
+                        membantu Anda dalam proses triase medis.
                         <br />
                         <br />
-                        Silakan ceritakan keluhan utama atau gejala yang Anda rasakan saat ini.
+                        Silakan ceritakan keluhan utama atau gejala yang Anda
+                        rasakan saat ini.
                       </p>
                     </div>
                   </div>
@@ -223,66 +288,123 @@ export function ChatMessagesView({
                         </div>
                       )}
                       <div className="flex items-start gap-3">
-                        <div className="rounded-2xl rounded-bl-sm bg-white border-2 border-gray-200 text-gray-900 px-4 py-2.5 shadow-lg">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            className="prose prose-sm max-w-none text-foreground"
-                            components={{
-                              p: ({ children }) => (
-                                <p className="mb-3 last:mb-0 text-foreground leading-relaxed">
-                                  {children}
-                                </p>
-                              ),
-                              ol: ({ children }) => (
-                                <ol className="list-decimal list-outside ml-5 mb-3 space-y-2 text-foreground">
-                                  {children}
-                                </ol>
-                              ),
-                              ul: ({ children }) => (
-                                <ul className="list-disc list-outside ml-5 mb-3 space-y-2 text-foreground">
-                                  {children}
-                                </ul>
-                              ),
-                              li: ({ children }) => (
-                                <li className="ml-2 text-foreground leading-relaxed">
-                                  {children}
-                                </li>
-                              ),
-                              strong: ({ children }) => (
-                                <strong className="font-semibold text-foreground">
-                                  {children}
-                                </strong>
-                              ),
-                              em: ({ children }) => (
-                                <em className="italic text-foreground">
-                                  {children}
-                                </em>
-                              ),
-                              code: ({ children }) => (
-                                <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-foreground">
-                                  {children}
-                                </code>
-                              ),
-                              pre: ({ children }) => (
-                                <pre className="bg-muted p-3 rounded-lg overflow-x-auto my-2 text-foreground">
-                                  {children}
-                                </pre>
-                              ),
-                              a: ({ href, children }) => (
-                                <a
-                                  href={href}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary underline hover:text-primary/80"
+                        <div className="rounded-2xl rounded-bl-sm bg-white border-2 border-gray-200 text-gray-900 px-4 py-2.5 shadow-lg w-full">
+                          {/* Parse and display select if present */}
+                          {(() => {
+                            const selectData = parseSelectData(message.content);
+                            const displayContent = removeSelectMarkers(
+                              message.content
+                            );
+
+                            return (
+                              <>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  className="prose prose-sm max-w-none text-foreground"
+                                  components={{
+                                    p: ({ children }) => (
+                                      <p className="mb-3 last:mb-0 text-foreground leading-relaxed">
+                                        {children}
+                                      </p>
+                                    ),
+                                    ol: ({ children }) => (
+                                      <ol className="list-decimal list-outside ml-5 mb-3 space-y-2 text-foreground">
+                                        {children}
+                                      </ol>
+                                    ),
+                                    ul: ({ children }) => (
+                                      <ul className="list-disc list-outside ml-5 mb-3 space-y-2 text-foreground">
+                                        {children}
+                                      </ul>
+                                    ),
+                                    li: ({ children }) => (
+                                      <li className="ml-2 text-foreground leading-relaxed">
+                                        {children}
+                                      </li>
+                                    ),
+                                    strong: ({ children }) => (
+                                      <strong className="font-semibold text-foreground">
+                                        {children}
+                                      </strong>
+                                    ),
+                                    em: ({ children }) => (
+                                      <em className="italic text-foreground">
+                                        {children}
+                                      </em>
+                                    ),
+                                    code: ({ children }) => (
+                                      <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-foreground">
+                                        {children}
+                                      </code>
+                                    ),
+                                    pre: ({ children }) => (
+                                      <pre className="bg-muted p-3 rounded-lg overflow-x-auto my-2 text-foreground">
+                                        {children}
+                                      </pre>
+                                    ),
+                                    a: ({ href, children }) => (
+                                      <a
+                                        href={href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary underline hover:text-primary/80"
+                                      >
+                                        {children}
+                                      </a>
+                                    ),
+                                    br: () => <br className="mb-2" />,
+                                  }}
                                 >
-                                  {children}
-                                </a>
-                              ),
-                              br: () => <br className="mb-2" />,
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
+                                  {displayContent}
+                                </ReactMarkdown>
+
+                                {/* Display select dropdown if select data is present */}
+                                {selectData && (
+                                  <div className="mt-4">
+                                    <select
+                                      value={
+                                        selectedFamilyMember[message.id] || ""
+                                      }
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setSelectedFamilyMember((prev) => ({
+                                          ...prev,
+                                          [message.id]: value,
+                                        }));
+                                        // Auto-submit when selection is made
+                                        const selectedOption =
+                                          selectData.options.find(
+                                            (opt) => opt.value === value
+                                          );
+                                        if (selectedOption) {
+                                          const responseText =
+                                            selectedOption.relationship
+                                              ? `${selectedOption.label} (${selectedOption.relationship})`
+                                              : selectedOption.label;
+                                          onSubmit(responseText);
+                                        }
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                      <option value="">
+                                        Pilih anggota keluarga...
+                                      </option>
+                                      {selectData.options.map((option) => (
+                                        <option
+                                          key={option.value}
+                                          value={option.value}
+                                        >
+                                          {option.label}{" "}
+                                          {option.relationship &&
+                                            `(${option.relationship})`}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         <Button
                           variant="ghost"

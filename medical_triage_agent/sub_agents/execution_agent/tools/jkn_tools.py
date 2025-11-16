@@ -327,3 +327,84 @@ query_jkn_medical_history_tool = FunctionTool(
     func=query_jkn_medical_history,
 )
 
+
+def query_family_members(patient_id: str) -> str:
+    """
+    Query anggota keluarga yang terdaftar di satu Kartu Keluarga (KK) di JKN/BPJS.
+    
+    MOCK IMPLEMENTATION untuk Hackathon - Simulasi query anggota keluarga.
+    Dalam implementasi produksi, ini akan terintegrasi dengan:
+    - API BPJS untuk query anggota keluarga berdasarkan KK
+    - Database JKN untuk query anggota keluarga
+    - Sistem registrasi keluarga JKN
+    
+    Args:
+        patient_id: ID pasien BPJS (NIK atau nomor BPJS) untuk mendapatkan KK
+        
+    Returns:
+        JSON string dengan daftar anggota keluarga yang terdaftar di KK yang sama
+    """
+    # Simulasi: Daftar anggota keluarga berdasarkan KK
+    # Dalam implementasi real, ini akan query dari database BPJS
+    family_members = [
+        {
+            "member_id": "P001",
+            "name": "Sasmito",
+            "relationship": "Kepala Keluarga",
+            "nik": patient_id,
+            "age": 35,
+            "gender": "Laki-laki"
+        },
+        {
+            "member_id": "P002",
+            "name": "Siti Nurhaliza",
+            "relationship": "Istri",
+            "nik": "3201234567890123",
+            "age": 32,
+            "gender": "Perempuan"
+        },
+        {
+            "member_id": "P003",
+            "name": "Ahmad Rizki",
+            "relationship": "Anak",
+            "nik": "3201234567890124",
+            "age": 8,
+            "gender": "Laki-laki"
+        },
+        {
+            "member_id": "P004",
+            "name": "Putri",
+            "relationship": "Anak",
+            "nik": "3201234567890125",
+            "age": 5,
+            "gender": "Perempuan"
+        },
+        {
+            "member_id": "P005",
+            "name": "Bambang Sutrisno",
+            "relationship": "Ayah",
+            "nik": "3201234567890126",
+            "age": 65,
+            "gender": "Laki-laki"
+        },
+        {
+            "member_id": "P006",
+            "name": "Siti Fatimah",
+            "relationship": "Ibu",
+            "nik": "3201234567890127",
+            "age": 60,
+            "gender": "Perempuan"
+        }
+    ]
+    
+    return json.dumps({
+        "family_card_number": "KK-3201234567890123",
+        "family_members": family_members,
+        "total_members": len(family_members)
+    }, ensure_ascii=False, indent=2)
+
+
+query_family_members_tool = FunctionTool(
+    func=query_family_members,
+)
+

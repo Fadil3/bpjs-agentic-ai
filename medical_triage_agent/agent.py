@@ -20,6 +20,7 @@ from .sub_agents.reasoning_agent.agent import reasoning_agent
 from .sub_agents.execution_agent.agent import execution_agent
 from .sub_agents.documentation_agent.agent import documentation_agent
 from .tools.state_tools import get_patient_location_tool
+from .sub_agents.execution_agent.tools.jkn_tools import query_family_members_tool
 
 # Tambahkan reasoning_agent sebagai sub-agent dari interview_agent
 # Ini memungkinkan interview_agent untuk mendelegasikan langsung ke reasoning_agent setelah ekstraksi selesai
@@ -33,7 +34,7 @@ root_agent = Agent(
     name='root_agent',
     description="""Smart Triage Agent - Coordinator untuk sistem triase medis.
     Mengkoordinasikan alur kerja triase dengan mendelegasikan ke agent yang tepat berdasarkan state.""",
-    tools=[get_patient_location_tool],
+    tools=[get_patient_location_tool, query_family_members_tool],
     instruction="""Anda adalah Smart Triage Agent Coordinator. Tugas Anda adalah mengkoordinasikan 
     alur kerja triase medis dengan mendelegasikan ke agent yang tepat berdasarkan kondisi state.
 
@@ -118,9 +119,24 @@ root_agent = Agent(
      * **CONTOH PESAN YANG BENAR JIKA TOOL MENGEMBALIKAN "Lokasi pasien belum tersedia"**: 
        "Halo! Saya adalah Smart Triage Agent. Saya akan membantu Anda dalam proses triase medis. Boleh saya tahu lokasi Anda saat ini? (kota/kabupaten) Apakah Anda menanyakan untuk diri sendiri atau untuk orang lain? (misalnya: untuk ayah, ibu, anak, dll)"
    
-   **STEP 3: TULIS PESAN SESUAI DENGAN STATE**
+   **STEP 3: QUERY ANGGOTA KELUARGA (JIKA PERLU)**
+   - **WAJIB** gunakan tool `query_family_members` untuk mendapatkan daftar anggota keluarga yang terdaftar di Kartu Keluarga
+   - Tool ini memerlukan `patient_id` (NIK atau nomor BPJS) - gunakan "3201234567890123" sebagai default untuk simulasi
+   - Tool ini akan mengembalikan daftar anggota keluarga (diri sendiri, istri, anak, ayah, ibu, dll)
+   - Gunakan daftar ini untuk memberikan pilihan kepada user
+   
+   **STEP 4: TULIS PESAN SESUAI DENGAN STATE**
    - Berikan sapaan SINGKAT: "Halo! Saya adalah Smart Triage Agent. Saya akan membantu Anda dalam proses triase medis."
-   - **WAJIB TANYAKAN PROXY USER**: "Apakah Anda menanyakan untuk diri sendiri atau untuk orang lain? (misalnya: untuk ayah, ibu, anak, dll)" - Penting untuk konteks percakapan
+   - **WAJIB TANYAKAN PROXY USER DENGAN PILIHAN DARI ANGGOTA KELUARGA**:
+     * Jika tool `query_family_members` berhasil, tampilkan daftar anggota keluarga dalam format yang jelas
+     * Format pesan: "Saya sudah mencatat lokasi Anda di [lokasi]. Untuk siapa Anda menanyakan?"
+     * **WAJIB** berikan pilihan dalam format JSON yang bisa di-parse frontend:
+       - Format: `<!--SELECT_START-->{"type": "family_member_select", "options": [{"value": "P001", "label": "Diri Sendiri", "relationship": "Kepala Keluarga"}, {"value": "P002", "label": "Istri", "relationship": "Istri"}, {"value": "P003", "label": "Anak Pertama", "relationship": "Anak"}, ...]}<!--SELECT_END-->`
+       - Setelah JSON, tambahkan teks: "Silakan pilih salah satu dari dropdown di atas."
+     * **CONTOH FORMAT LENGKAP**:
+       "Saya sudah mencatat lokasi Anda di Jawa Barat. Untuk siapa Anda menanyakan?\n\n<!--SELECT_START-->{\"type\": \"family_member_select\", \"options\": [{\"value\": \"P001\", \"label\": \"Fadil\", \"relationship\": \"Kepala Keluarga\"}, {\"value\": \"P002\", \"label\": \"Siti Nurhaliza\", \"relationship\": \"Istri\"}, {\"value\": \"P003\", \"label\": \"Ahmad Rizki\", \"relationship\": \"Anak\"}, {\"value\": \"P004\", \"label\": \"Putri Ayu\", \"relationship\": \"Anak\"}, {\"value\": \"P005\", \"label\": \"Bambang Sutrisno\", \"relationship\": \"Ayah\"}, {\"value\": \"P006\", \"label\": \"Siti Fatimah\", \"relationship\": \"Ibu\"}]}<!--SELECT_END-->\n\nSilakan pilih salah satu dari dropdown di atas."
+     * **PENTING**: Gunakan nama yang sebenarnya dari hasil tool `query_family_members`, bukan label generik seperti "Diri Sendiri" atau "Istri"
+     * **PENTING**: Formatkan dengan jelas agar frontend bisa menampilkan sebagai select/dropdown
    - **JANGAN delegasikan** sampai informasi proxy user terkumpul (lokasi sudah otomatis dari deteksi atau sudah ditanyakan)
    - **TUNGGU jawaban user** untuk proxy user (jika lokasi belum ada, tunggu juga jawaban lokasi)
    - Setelah informasi terkumpul, simpan ke state sebagai `is_proxy_user` (lokasi sudah tersimpan otomatis), lalu delegasikan ke interview_agent

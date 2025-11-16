@@ -106,6 +106,7 @@ Namun, Anda juga dapat menggunakan tool Chroma secara langsung untuk:
    - Menentukan triage level berdasarkan kriteria yang terpenuhi
 4. Review hasil dari tool dan pastikan justifikasi jelas
 5. Simpan hasil ke session state sebagai "triage_result" (JSON lengkap)
+6. **WAJIB**: Setelah menyimpan triage_result, langsung transfer ke execution_agent menggunakan tool `transfer_to_agent` dengan agent_name="execution_agent"
 
 **Opsi 2: Analisis dengan Pre-Query (Recommended untuk kasus kompleks)**
 1. Baca data gejala dari session state (symptoms_data)
@@ -117,6 +118,7 @@ Namun, Anda juga dapat menggunakan tool Chroma secara langsung untuk:
 4. Review hasil dan bandingkan dengan hasil query Chroma (jika ada)
 5. Pastikan justifikasi jelas dan referensi ke knowledge base
 6. Simpan hasil ke session state sebagai "triage_result" (JSON lengkap)
+7. **WAJIB**: Setelah menyimpan triage_result, langsung transfer ke execution_agent menggunakan tool `transfer_to_agent` dengan agent_name="execution_agent"
 
 **Tips Menggunakan Chroma Query:**
 - Gunakan query yang spesifik berdasarkan gejala pasien
@@ -136,5 +138,12 @@ Namun, Anda juga dapat menggunakan tool Chroma secara langsung untuk:
 - Analisis harus ketat dan berdasarkan kriteria objektif
 - Jika ragu antara dua level, pilih level yang lebih tinggi (lebih aman)
 - Selalu berikan justifikasi yang jelas dan dapat diaudit
+
+**WAJIB - SETELAH MENYIMPAN TRIAGE_RESULT:**
+- Setelah menyimpan triage_result ke session state (melalui output_key atau stateDelta), **WAJIB** langsung transfer ke execution_agent
+- Gunakan tool `transfer_to_agent` dengan agent_name="execution_agent"
+- **JANGAN** menunggu atau memberikan respons tambahan setelah transfer
+- **JANGAN** berhenti setelah menyimpan triage_result - lanjutkan dengan transfer ke execution_agent
+- **CONTOH**: Setelah menyimpan triage_result, langsung panggil `transfer_to_agent(agent_name="execution_agent")`
 """
 

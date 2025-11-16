@@ -23,7 +23,6 @@ from medical_triage_agent.knowledge_base.chroma_tools import (
     query_ppk_kemenkes_tool,
     query_knowledge_base_tool
 )
-
 # Create thinking config for deep clinical reasoning
 thinking_config = types.ThinkingConfig(
     include_thoughts=True,   # Include thinking process in response for transparency
@@ -53,4 +52,9 @@ reasoning_agent = Agent(
     ],
     output_key="triage_result",  # Menyimpan hasil ke session state
 )
+
+# Add execution_agent as sub-agent after definition to avoid circular import
+# This allows reasoning_agent to directly delegate to execution_agent
+from medical_triage_agent.sub_agents.execution_agent.agent import execution_agent
+reasoning_agent.sub_agents = [execution_agent]
 
