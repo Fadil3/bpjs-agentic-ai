@@ -179,21 +179,21 @@ Bayangkan Anda sedang **mengunjungi rumah sakit digital**:
 
 ```mermaid
 flowchart TD
-    START([Anda: "Saya pusing"]) --> COORD1[Koordinator<br/>Menerima Pesan]
+    START([Anda: Saya pusing]) --> COORD1[Koordinator<br/>Menerima Pesan]
 
     COORD1 --> CHECK{Buku Catatan<br/>Masih Kosong?}
 
-    CHECK -->|Ya| NURSE[Perawat Wawancara<br/>Bertanya: "Sudah berapa lama?<br/>Seberapa sakit?"]
+    CHECK -->|Ya| NURSE[Perawat Wawancara<br/>Bertanya detail gejala]
     CHECK -->|Tidak, ada catatan gejala| DOCTOR[Dokter Analis<br/>Membaca catatan<br/>Menentukan urgensi]
     CHECK -->|Tidak, ada keputusan| ADMIN[Koordinator Tindakan<br/>Mengambil tindakan]
     CHECK -->|Tidak, ada tindakan| SECRETARY[Pencatat Medis<br/>Membuat catatan SOAP]
 
-    NURSE --> ANSWER[Anda: "3 hari,<br/>sangat mengganggu"]
+    NURSE --> ANSWER[Anda menjawab:<br/>3 hari, sangat mengganggu]
     ANSWER --> SAVE1[Mencatat di<br/>Buku Catatan]
     SAVE1 --> COORD2[Koordinator<br/>Melihat catatan ada]
 
     COORD2 --> DOCTOR
-    DOCTOR --> DECISION[Keputusan:<br/>"Gawat Darurat"]
+    DOCTOR --> DECISION[Keputusan:<br/>Gawat Darurat]
     DECISION --> SAVE2[Mencatat di<br/>Buku Catatan]
     SAVE2 --> COORD3[Koordinator<br/>Melihat keputusan ada]
 
@@ -378,10 +378,10 @@ graph TD
 
 ```mermaid
 flowchart TD
-    START([Anda: "Pusing ringan<br/>setelah bangun tidur"]) --> NURSE[Perawat Wawancara<br/>Bertanya detail]
-    NURSE --> ANSWER[Anda: "Baru saja,<br/>ringan, sudah membaik"]
+    START([Anda: Pusing ringan<br/>setelah bangun tidur]) --> NURSE[Perawat Wawancara<br/>Bertanya detail]
+    NURSE --> ANSWER[Anda menjawab:<br/>Baru saja, ringan,<br/>sudah membaik]
     ANSWER --> DOCTOR[Dokter Analis<br/>Membaca catatan]
-    DOCTOR --> DECISION[Keputusan:<br/>🟢 Non-Urgen]
+    DOCTOR --> DECISION[Keputusan:<br/>Non-Urgen]
     DECISION --> ADMIN[Koordinator Tindakan<br/>Berikan panduan<br/>perawatan di rumah]
     ADMIN --> SECRETARY[Pencatat Medis<br/>Mencatat informasi]
     SECRETARY --> RESULT[Hasil:<br/>Panduan perawatan<br/>+ Catatan medis]
@@ -411,10 +411,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    START([Anda: "Anak sakit perut<br/>kanan bawah, demam"]) --> NURSE[Perawat Wawancara<br/>Bertanya detail]
-    NURSE --> ANSWER[Anda: "6 jam, cukup parah,<br/>demam 38.2°C, mual"]
-    ANSWER --> DOCTOR[Dokter Analis<br/>Membaca & membandingkan<br/>dengan pedoman]
-    DOCTOR --> DECISION[Keputusan:<br/>🟠 Mendesak<br/>Kecurigaan apendisitis]
+    START([Anda: Anak sakit perut<br/>kanan bawah, demam]) --> NURSE[Perawat Wawancara<br/>Bertanya detail]
+    NURSE --> ANSWER[Anda menjawab:<br/>6 jam, cukup parah,<br/>demam 38.2°C, mual]
+    ANSWER --> DOCTOR[Dokter Analis<br/>Membaca dan membandingkan<br/>dengan pedoman]
+    DOCTOR --> DECISION[Keputusan:<br/>Mendesak<br/>Kecurigaan apendisitis]
     DECISION --> ADMIN[Koordinator Tindakan<br/>Cari jadwal dokter bedah<br/>Jadwalkan konsultasi<br/>telehealth besok]
     ADMIN --> SECRETARY[Pencatat Medis<br/>Mencatat informasi]
     SECRETARY --> RESULT[Hasil:<br/>Jadwal konsultasi<br/>+ Catatan medis<br/>Jika memburuk → IGD]
@@ -444,10 +444,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    START([Anda: "Pusing berputar<br/>sangat parah,<br/>tidak bisa berdiri"]) --> NURSE[Perawat Wawancara<br/>Bertanya detail gejala]
-    NURSE --> ANSWER[Anda: "3 hari, sangat<br/>mengganggu,<br/>telinga berdengung"]
-    ANSWER --> DOCTOR[Dokter Analis<br/>Membaca & membandingkan<br/>dengan pedoman]
-    DOCTOR --> DECISION[Keputusan:<br/>🔴 Gawat Darurat]
+    START([Anda: Pusing berputar<br/>sangat parah,<br/>tidak bisa berdiri]) --> NURSE[Perawat Wawancara<br/>Bertanya detail gejala]
+    NURSE --> ANSWER[Anda menjawab:<br/>3 hari, sangat mengganggu,<br/>telinga berdengung]
+    ANSWER --> DOCTOR[Dokter Analis<br/>Membaca dan membandingkan<br/>dengan pedoman]
+    DOCTOR --> DECISION[Keputusan:<br/>Gawat Darurat]
     DECISION --> ADMIN[Koordinator Tindakan<br/>LANGSUNG:<br/>Panggil ambulans<br/>Hubungi IGD terdekat]
     ADMIN --> SECRETARY[Pencatat Medis<br/>Mencatat informasi]
     SECRETARY --> RESULT[Hasil:<br/>Ambulans datang<br/>Dibawa ke IGD<br/>+ Catatan medis lengkap]
