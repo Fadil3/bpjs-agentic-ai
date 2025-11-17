@@ -2,6 +2,8 @@
 
 Dokumen ini menjelaskan arsitektur sistem agentic AI untuk Medical Triage Agent dengan cara yang sederhana dan mudah dipahami.
 
+> 📖 **Untuk pengguna non-teknis**: Jika Anda mencari penjelasan yang lebih sederhana tanpa istilah teknis, silakan baca [AGENTIC_AI_ARCHITECTURE_SIMPLE.md](./AGENTIC_AI_ARCHITECTURE_SIMPLE.md) yang menggunakan analogi dan bahasa sehari-hari.
+
 ## 📋 Daftar Isi
 
 1. [Konsep Dasar](#konsep-dasar)
