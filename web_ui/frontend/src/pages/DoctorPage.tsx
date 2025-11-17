@@ -1,19 +1,11 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Search,
-  FileText,
-  Calendar,
-  User,
-  Pill,
-  Activity,
-  AlertCircle,
-  Clock,
-} from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Search, FileText, Calendar, User, Pill, Activity } from "lucide-react";
 
 interface Patient {
   id: string;
@@ -295,9 +287,11 @@ export function DoctorPage() {
                                 <h4 className="font-semibold text-sm text-orange-600 mb-2">
                                   A (Asesmen)
                                 </h4>
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                  {note.assessment}
-                                </p>
+                                <div className="text-sm text-gray-700 prose prose-sm max-w-none">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {note.assessment}
+                                  </ReactMarkdown>
+                                </div>
                                 {note.icdCodes && note.icdCodes.length > 0 && (
                                   <div className="mt-2">
                                     <p className="text-xs font-medium text-gray-600 mb-1">
@@ -322,9 +316,11 @@ export function DoctorPage() {
                                 <h4 className="font-semibold text-sm text-purple-600 mb-2">
                                   P (Plan)
                                 </h4>
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                  {note.plan}
-                                </p>
+                                <div className="text-sm text-gray-700 prose prose-sm max-w-none">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {note.plan}
+                                  </ReactMarkdown>
+                                </div>
                               </div>
                             </div>
                           </Card>
